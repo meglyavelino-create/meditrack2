@@ -21,6 +21,13 @@ export function getMedicationTime(medication: Medication): string {
   return medication.times?.["0"] ?? ""
 }
 
+export function getMedicationTimes(medication: Medication): string[] {
+  return Object.keys(medication.times ?? {})
+    .sort((a, b) => Number(a) - Number(b))
+    .map(key => medication.times[key])
+    .filter(Boolean)
+}
+
 function todayKey() {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
@@ -55,18 +62,12 @@ export async function createMedication(
     name: medication.name,
     notes: medication.notes ?? "",
     startDate,
-    times: {
-      "0": time,
-    },
+    times: { "0": time },
     unit: medication.unit,
     updatedAt: now,
     userId: uid,
   }
 
-  // Create the medication and its initial dose status together.
-  // The web app creates the dose as PENDING. The ESP32 is responsible
-  // for changing that dose to TAKEN or MISSED later.
-  // update() is used so existing Firebase data is never overwritten.
   await update(ref(realtimeDb), {
     [`medications/${uid}/${medicationId}`]: record,
     [`doseStatus/${uid}/${medicationId}/${startDate}/${time}`]: {
@@ -75,12 +76,57 @@ export async function createMedication(
     },
   })
 
-  return {
-    ...record,
-    id: medicationId,
+  return { ...record, id: medicationId }
+}
+
+export async function updateMedication(
+  uid: string,
+  medicationId: string,
+  medication: {
+    name: string
+    dosage: string
+    unit: string
+    time: string
+    active: boolean
+    form?: string
+    frequency?: string
+    startDate?: string
+    notes?: string
+  },
+  previousDate: string,
+  previousTime: string,
+  currentStatus: "pending" | "missed" = "pending",
+) {
+  const now = Date.now()
+  const startDate = medication.startDate ?? todayKey()
+  const record = {
+    active: medication.active,
+    dosage: medication.dosage,
+    form: medication.form ?? "Tablet",
+    frequency: medication.frequency ?? "Once Daily",
+    name: medication.name,
+    notes: medication.notes ?? "",
+    startDate,
+    times: { "0": medication.time },
+    unit: medication.unit,
+    updatedAt: now,
+    userId: uid,
   }
+
+  const updates: Record<string, unknown> = {
+    [`medications/${uid}/${medicationId}`]: record,
+    [`doseStatus/${uid}/${medicationId}/${previousDate}/${previousTime}`]: null,
+    [`doseStatus/${uid}/${medicationId}/${startDate}/${medication.time}`]: {
+      status: currentStatus,
+      updatedAt: now,
+    },
+  }
+
+  await update(ref(realtimeDb), updates)
+  return { ...record, id: medicationId }
 }
 
 export async function deleteMedication(uid: string, id: string) {
   await remove(ref(realtimeDb, `medications/${uid}/${id}`))
+  await remove(ref(realtimeDb, `doseStatus/${uid}/${id}`))
 }
