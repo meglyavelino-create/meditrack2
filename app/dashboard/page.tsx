@@ -9,11 +9,7 @@ import type { Medication } from "../../lib/medications"
 
 type DoseStatus = "pending" | "taken" | "missed"
 
-type UserInfo = {
-  uid: string
-  name: string
-  email: string
-}
+type UserInfo = { uid: string; name: string; email: string }
 
 function Icon({ type, size = 25 }: { type: "pill" | "check" | "clock" | "trend" | "home" | "calendar" | "history" | "profile"; size?: number }) {
   const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
@@ -30,12 +26,12 @@ function Icon({ type, size = 25 }: { type: "pill" | "check" | "clock" | "trend" 
 function formatTime(time: string) {
   if (!time || !time.includes(":")) return time
   const [h, m] = time.split(":").map(Number)
-  const suffix = h >= 12 ? "PM" : "AM"
   const hour = h % 12 || 12
-  return `${hour}:${String(m).padStart(2, "0")} ${suffix}`
+  return `${hour}:${String(m).padStart(2, "0")}`
 }
 
 function minutesFromTime(time: string) {
+  if (!time || !time.includes(":")) return 9999
   const [h, m] = time.split(":").map(Number)
   return h * 60 + m
 }
@@ -49,20 +45,10 @@ export default function DashboardPage() {
   const [error, setError] = useState("")
   const [now, setNow] = useState(new Date())
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, currentUser => {
-      if (!currentUser) {
-        setUser(null)
-        return
-      }
-      setUser({
-        uid: currentUser.uid,
-        name: currentUser.displayName || currentUser.email?.split("@")[0] || "there",
-        email: currentUser.email || "",
-      })
-    })
-    return unsubscribe
-  }, [])
+  useEffect(() => onAuthStateChanged(auth, currentUser => {
+    if (!currentUser) { setUser(null); return }
+    setUser({ uid: currentUser.uid, name: currentUser.displayName || currentUser.email?.split("@")[0] || "there", email: currentUser.email || "" })
+  }), [])
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30000)
@@ -70,44 +56,28 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    if (!user) {
-      setMedications([])
-      setStatuses({})
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
-    setError("")
+    if (!user) { setMedications([]); setStatuses({}); setLoading(false); return }
+    setLoading(true); setError("")
     return onValue(ref(realtimeDb, `medications/${user.uid}`), snapshot => {
       const value = snapshot.val() as Record<string, Medication> | null
       setMedications(value ? Object.entries(value).map(([id, medication]) => ({ ...medication, id })) : [])
       setLoading(false)
-    }, e => {
-      setError(e.message)
-      setLoading(false)
-    })
+    }, e => { setError(e.message); setLoading(false) })
   }, [user])
 
   useEffect(() => {
     if (!user || medications.length === 0) return
     const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-    const unsubscribers = medications.map(medication => onValue(
-      ref(realtimeDb, `doseStatus/${user.uid}/${medication.id}/${dateKey}`),
-      snapshot => {
-        const value = snapshot.val() as Record<string, { status?: DoseStatus }> | null
-        setStatuses(previous => {
-          const next = { ...previous }
-          for (const [time, dose] of Object.entries(value ?? {})) {
-            if (dose?.status === "pending" || dose?.status === "taken" || dose?.status === "missed") {
-              next[`${medication.id}|${time}`] = dose.status
-            }
-          }
-          return next
-        })
-      },
-      e => setError(e.message)
-    ))
+    const unsubscribers = medications.map(medication => onValue(ref(realtimeDb, `doseStatus/${user.uid}/${medication.id}/${dateKey}`), snapshot => {
+      const value = snapshot.val() as Record<string, { status?: DoseStatus }> | null
+      setStatuses(previous => {
+        const next = { ...previous }
+        for (const [time, dose] of Object.entries(value ?? {})) {
+          if (dose?.status === "pending" || dose?.status === "taken" || dose?.status === "missed") next[`${medication.id}|${time}`] = dose.status
+        }
+        return next
+      })
+    }, e => setError(e.message)))
     return () => unsubscribers.forEach(unsubscribe => unsubscribe())
   }, [user, medications, now.getDate(), now.getMonth(), now.getFullYear()])
 
@@ -120,110 +90,83 @@ export default function DashboardPage() {
   const missed = todayDoses.filter(d => d.status === "missed").length
   const completed = taken + missed
   const adherence = completed ? Math.round((taken / completed) * 100) : 0
-
-  const nextDose = todayDoses.find(d => d.status === "pending" && minutesFromTime(d.time) >= now.getHours() * 60 + now.getMinutes()) || todayDoses.find(d => d.status === "pending")
+  const currentMinutes = now.getHours() * 60 + now.getMinutes()
+  const nextDose = todayDoses.find(d => d.status === "pending" && minutesFromTime(d.time) >= currentMinutes) || todayDoses.find(d => d.status === "pending")
 
   const countdown = useMemo(() => {
-    if (!nextDose) return "All done"
-    let target = new Date(now)
+    if (!nextDose) return "0h 00m"
+    const target = new Date(now)
     const [h, m] = nextDose.time.split(":").map(Number)
     target.setHours(h, m, 0, 0)
     if (target.getTime() <= now.getTime()) target.setDate(target.getDate() + 1)
-    const diff = Math.max(0, target.getTime() - now.getTime())
-    const totalMinutes = Math.floor(diff / 60000)
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    return `${hours}h ${String(minutes).padStart(2, "0")}m`
+    const totalMinutes = Math.floor(Math.max(0, target.getTime() - now.getTime()) / 60000)
+    return `${Math.floor(totalMinutes / 60)}h ${String(totalMinutes % 60).padStart(2, "0")}m`
   }, [nextDose, now])
 
-  const firstName = user?.name?.split(" ")[0] || "there"
-
   if (!user) return null
+  const firstName = user.name.split(" ")[0] || "there"
 
   return (
-    <main style={{ minHeight: "calc(100vh - 1px)", background: "#eef6f3", color: "#142234", paddingBottom: 92 }}>
-      <section style={{ background: "white", borderBottom: "1px solid #dfe9e5" }}>
-        <div style={{ maxWidth: 820, margin: "0 auto", padding: "42px 24px 34px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 18 }}>
+    <main style={{ minHeight: "100vh", background: "#edf5f2", color: "#142234", paddingBottom: 82, fontFamily: "Arial, Helvetica, sans-serif" }}>
+      <style>{`*{box-sizing:border-box}@media(max-width:600px){.mt-content{padding-left:16px!important;padding-right:16px!important}.mt-header{padding-top:42px!important;padding-bottom:30px!important}.mt-title{font-size:36px!important}.mt-subtitle{font-size:19px!important}.mt-add{width:62px!important;height:62px!important;font-size:36px!important}.mt-next{padding:28px 22px 22px!important;border-radius:30px!important}.mt-count{font-size:54px!important}.mt-stat{padding:17px 14px!important;min-height:118px!important}.mt-stat-value{font-size:32px!important}.mt-stat-label{font-size:15px!important}.mt-section-title{font-size:24px!important}.mt-dose{padding:15px 14px!important}.mt-dose-name{font-size:18px!important}.mt-dose-info{font-size:15px!important}.mt-bottom{height:76px!important}.mt-bottom-item{font-size:12px!important}}`}</style>
+
+      <header style={{ background: "#fff", borderBottom: "1px solid #dce8e4" }}>
+        <div className="mt-content mt-header" style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: "48px 22px 34px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18 }}>
             <div>
-              <div style={{ color: "#43ae82", fontWeight: 800, fontSize: 18, marginBottom: 12 }}>MediTrack</div>
-              <h1 style={{ margin: 0, fontSize: 42, lineHeight: 1.05, letterSpacing: -1.4 }}>Hi, {firstName}</h1>
-              <p style={{ margin: "12px 0 0", color: "#71808e", fontSize: 21 }}>Here's your plan for today</p>
+              <h1 className="mt-title" style={{ margin: 0, fontSize: 42, lineHeight: 1.05, letterSpacing: -1.2, fontWeight: 800 }}>Hi, {firstName}</h1>
+              <p className="mt-subtitle" style={{ margin: "12px 0 0", color: "#71808e", fontSize: 20 }}>Here's your plan for today</p>
             </div>
-            <button onClick={() => router.push("/medications")} aria-label="Add medication" style={{ width: 72, height: 72, border: 0, borderRadius: "50%", background: "#45b083", color: "white", fontSize: 42, lineHeight: 1, cursor: "pointer", boxShadow: "0 8px 18px rgba(57,145,107,.18)" }}>+</button>
+            <button className="mt-add" onClick={() => router.push("/medications")} aria-label="Add medication" style={{ flexShrink: 0, width: 68, height: 68, border: 0, borderRadius: "50%", background: "#45b083", color: "white", fontSize: 40, lineHeight: 1, cursor: "pointer", boxShadow: "0 7px 18px rgba(57,145,107,.18)" }}>+</button>
           </div>
         </div>
-      </section>
+      </header>
 
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "30px 24px" }}>
+      <div className="mt-content" style={{ width: "100%", maxWidth: 760, margin: "0 auto", padding: "30px 22px 28px" }}>
         {error && <div style={{ background: "#fff1f0", color: "#b42318", padding: 14, borderRadius: 14, marginBottom: 18 }}>Firebase error: {error}</div>}
 
-        <section style={{ background: "#45ae80", borderRadius: 32, padding: "34px 34px 28px", color: "white", boxShadow: "0 14px 30px rgba(55,145,106,.15)" }}>
-          <div style={{ fontSize: 17, fontWeight: 800, letterSpacing: 1.1, opacity: .92 }}>NEXT DOSE IN</div>
-          <div style={{ fontSize: 66, lineHeight: 1.05, fontWeight: 800, margin: "10px 0 22px", letterSpacing: -2 }}>{countdown}</div>
-          {nextDose ? (
-            <div style={{ background: "rgba(255,255,255,.18)", borderRadius: 24, padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 25, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextDose.medication.name}</div>
-                <div style={{ marginTop: 4, fontSize: 18, opacity: .9 }}>{nextDose.medication.dosage} {nextDose.medication.unit}</div>
-              </div>
-              <div style={{ flexShrink: 0, background: "rgba(255,255,255,.24)", padding: "10px 17px", borderRadius: 30, fontSize: 20, fontWeight: 800 }}>{formatTime(nextDose.time)}</div>
-            </div>
-          ) : <div style={{ background: "rgba(255,255,255,.16)", borderRadius: 22, padding: 20, fontSize: 18 }}>No pending doses for today.</div>}
+        <section className="mt-next" style={{ background: "#45ae80", borderRadius: 30, padding: "32px 30px 25px", color: "white", boxShadow: "0 12px 25px rgba(55,145,106,.15)" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: 1.1, opacity: .92 }}>NEXT DOSE IN</div>
+          <div className="mt-count" style={{ fontSize: 64, lineHeight: 1.05, fontWeight: 800, margin: "8px 0 20px", letterSpacing: -2 }}>{countdown}</div>
+          {nextDose ? <div style={{ background: "rgba(255,255,255,.19)", borderRadius: 23, padding: "17px 19px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <div style={{ minWidth: 0 }}><div style={{ fontSize: 23, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nextDose.medication.name}</div><div style={{ marginTop: 4, fontSize: 17, opacity: .9 }}>{nextDose.medication.dosage} {nextDose.medication.unit}</div></div>
+            <div style={{ flexShrink: 0, background: "rgba(255,255,255,.25)", padding: "9px 15px", borderRadius: 28, fontSize: 18, fontWeight: 800 }}>{formatTime(nextDose.time)}</div>
+          </div> : <div style={{ background: "rgba(255,255,255,.17)", borderRadius: 20, padding: 18 }}>No pending doses for today.</div>}
         </section>
 
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginTop: 24 }}>
+        <section style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 15, marginTop: 24 }}>
           {[
             { icon: "check" as const, value: taken, label: "Taken", color: "#3aa87d" },
             { icon: "clock" as const, value: missed, label: "Missed", color: "#df5d64" },
             { icon: "trend" as const, value: `${adherence}%`, label: "Adherence", color: "#3c6ea4" },
-          ].map(card => <div key={card.label} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 28, padding: "22px 20px", minHeight: 142 }}>
-            <div style={{ color: card.color, marginBottom: 12 }}><Icon type={card.icon} size={28} /></div>
-            <div style={{ fontSize: 39, lineHeight: 1, fontWeight: 800 }}>{card.value}</div>
-            <div style={{ color: "#73818d", fontSize: 18, marginTop: 9 }}>{card.label}</div>
+          ].map(card => <div className="mt-stat" key={card.label} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 26, padding: "21px 18px", minHeight: 135 }}>
+            <div style={{ color: card.color, marginBottom: 11 }}><Icon type={card.icon} size={27} /></div><div className="mt-stat-value" style={{ fontSize: 37, lineHeight: 1, fontWeight: 800 }}>{card.value}</div><div className="mt-stat-label" style={{ color: "#73818d", fontSize: 17, marginTop: 9 }}>{card.label}</div>
           </div>)}
         </section>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "36px 2px 18px" }}>
-          <h2 style={{ margin: 0, fontSize: 28, letterSpacing: -.5 }}>Today's doses</h2>
-          <button onClick={() => router.push("/medications")} style={{ border: 0, background: "transparent", color: "#3ca77b", fontWeight: 800, cursor: "pointer", fontSize: 15 }}>Manage</button>
-        </div>
+        <h2 className="mt-section-title" style={{ margin: "34px 0 17px", fontSize: 27, letterSpacing: -.5 }}>Today's doses</h2>
 
-        {loading ? <div style={{ background: "white", borderRadius: 24, padding: 28, color: "#71808e" }}>Loading your medications...</div> : todayDoses.length === 0 ? (
-          <div style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 26, padding: 30, textAlign: "center" }}>
-            <div style={{ fontSize: 21, fontWeight: 800 }}>No medications yet</div>
-            <p style={{ color: "#71808e" }}>Add your first medication schedule to start tracking doses.</p>
-            <button onClick={() => router.push("/medications")} style={{ border: 0, background: "#45ae80", color: "white", borderRadius: 18, padding: "13px 22px", fontWeight: 800, cursor: "pointer" }}>Add medication</button>
-          </div>
-        ) : <div style={{ display: "grid", gap: 13 }}>
+        {loading ? <div style={{ background: "white", borderRadius: 23, padding: 26, color: "#71808e" }}>Loading your medications...</div> : todayDoses.length === 0 ? <div style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 24, padding: 28, textAlign: "center" }}><div style={{ fontSize: 20, fontWeight: 800 }}>No medications yet</div><p style={{ color: "#71808e" }}>Add your first medication schedule to start tracking doses.</p><button onClick={() => router.push("/medications")} style={{ border: 0, background: "#45ae80", color: "white", borderRadius: 18, padding: "12px 20px", fontWeight: 800, cursor: "pointer" }}>Add medication</button></div> : <div style={{ display: "grid", gap: 12 }}>
           {todayDoses.map(({ medication, time, status }) => {
             const takenDose = status === "taken"
             const missedDose = status === "missed"
-            return <article key={medication.id} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 25, padding: "17px 18px", display: "flex", alignItems: "center", gap: 15 }}>
-              <div style={{ width: 58, height: 58, flexShrink: 0, borderRadius: "50%", background: "#e5effa", color: "#4b79a8", display: "grid", placeItems: "center" }}><Icon type="pill" size={27} /></div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontWeight: 800, fontSize: 21, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{medication.name}</div>
-                <div style={{ color: "#71808e", fontSize: 17, marginTop: 3 }}>{medication.dosage} {medication.unit} · {formatTime(time)}</div>
-              </div>
-              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 7, background: takenDose ? "#dff2e9" : missedDose ? "#fde6e6" : "#eef1f2", color: takenDose ? "#3b9f78" : missedDose ? "#cf5058" : "#667784", borderRadius: 22, padding: "10px 15px", fontWeight: 800 }}>
-                <Icon type={takenDose ? "check" : "clock"} size={18} /> {takenDose ? "Taken" : missedDose ? "Missed" : "Pending"}
-              </div>
+            return <article className="mt-dose" key={medication.id} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 25, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 57, height: 57, flexShrink: 0, borderRadius: "50%", background: "#e3eef9", color: "#4d79a7", display: "grid", placeItems: "center" }}><Icon type="pill" size={27} /></div>
+              <div style={{ minWidth: 0, flex: 1 }}><div className="mt-dose-name" style={{ fontWeight: 800, fontSize: 20, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{medication.name}</div><div className="mt-dose-info" style={{ color: "#71808e", fontSize: 16, marginTop: 3 }}>{medication.dosage} {medication.unit} · {formatTime(time)}</div></div>
+              <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, background: takenDose ? "#dff2e9" : missedDose ? "#fde6e6" : "#eef1f2", color: takenDose ? "#3b9f78" : missedDose ? "#cf5058" : "#667784", borderRadius: 22, padding: "9px 13px", fontWeight: 800, fontSize: 15 }}><Icon type={takenDose ? "check" : "clock"} size={17} /> {takenDose ? "Taken" : missedDose ? "Missed" : "Pending"}</div>
             </article>
           })}
         </div>}
       </div>
 
-      <nav style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 76, background: "rgba(255,255,255,.98)", borderTop: "1px solid #dce7e3", display: "flex", justifyContent: "center", zIndex: 20 }}>
-        <div style={{ width: "100%", maxWidth: 820, display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
+      <nav className="mt-bottom" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 80, background: "rgba(255,255,255,.98)", borderTop: "1px solid #dce7e3", display: "flex", justifyContent: "center", zIndex: 20 }}>
+        <div style={{ width: "100%", maxWidth: 760, display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
           {[
             { label: "Home", icon: "home" as const, active: true, action: () => router.push("/dashboard") },
             { label: "Schedule", icon: "calendar" as const, active: false, action: () => router.push("/medications") },
             { label: "History", icon: "history" as const, active: false, action: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) },
             { label: "Profile", icon: "profile" as const, active: false, action: () => alert(`${user.name}\n${user.email}`) },
-          ].map(item => <button key={item.label} onClick={item.action} style={{ border: 0, background: "transparent", color: item.active ? "#3eaa7d" : "#657786", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontWeight: item.active ? 800 : 500, cursor: "pointer" }}>
-            <Icon type={item.icon} size={27} />
-            <span style={{ fontSize: 13 }}>{item.label}</span>
-          </button>)}
+          ].map(item => <button className="mt-bottom-item" key={item.label} onClick={item.action} style={{ border: 0, background: "transparent", color: item.active ? "#3eaa7d" : "#657786", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontWeight: item.active ? 800 : 500, cursor: "pointer" }}><Icon type={item.icon} size={27}/><span style={{ fontSize: 13 }}>{item.label}</span></button>)}
         </div>
       </nav>
     </main>
