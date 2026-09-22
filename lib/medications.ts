@@ -1,33 +1,64 @@
-import { push, ref, remove, set, update } from "firebase/database"
+import { push, ref, remove, set } from "firebase/database"
 import { realtimeDb } from "./firebase"
 
 export type Medication = {
   id: string
-  name: string
-  dosage: string
-  unit: string
-  time: string
   active: boolean
   createdAt: number
+  dosage: string
   form?: string
   frequency?: string
-  startDate?: string
+  name: string
   notes?: string
+  startDate?: string
+  times: Record<string, string>
+  unit: string
+  updatedAt?: number
+  userId?: string
 }
 
-export async function createMedication(uid: string, medication: Omit<Medication, "id" | "createdAt">) {
+export async function createMedication(
+  uid: string,
+  medication: {
+    name: string
+    dosage: string
+    unit: string
+    time: string
+    active: boolean
+    form?: string
+    frequency?: string
+    startDate?: string
+    notes?: string
+  },
+) {
   const medicationRef = push(ref(realtimeDb, `medications/${uid}`))
-  const record: Medication = {
-    ...medication,
-    id: medicationRef.key!,
-    createdAt: Date.now(),
-  }
-  await set(medicationRef, record)
-  return record
-}
+  const now = Date.now()
 
-export async function updateMedication(uid: string, id: string, changes: Partial<Omit<Medication, "id" | "createdAt">>) {
-  await update(ref(realtimeDb, `medications/${uid}/${id}`), changes)
+  // Original MediTrack Firebase structure.
+  // One medication ID has exactly one scheduled time at times/0.
+  const record = {
+    active: medication.active,
+    createdAt: now,
+    dosage: medication.dosage,
+    form: medication.form ?? "Tablet",
+    frequency: medication.frequency ?? "Once Daily",
+    name: medication.name,
+    notes: medication.notes ?? "",
+    startDate: medication.startDate ?? "",
+    times: {
+      "0": medication.time,
+    },
+    unit: medication.unit,
+    updatedAt: now,
+    userId: uid,
+  }
+
+  await set(medicationRef, record)
+
+  return {
+    ...record,
+    id: medicationRef.key!,
+  }
 }
 
 export async function deleteMedication(uid: string, id: string) {
