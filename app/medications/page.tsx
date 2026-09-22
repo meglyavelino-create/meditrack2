@@ -250,11 +250,13 @@ export default function MedicationsPage() {
                 <label className="field-label">Unit</label>
                 <select className="field" value={unit} onChange={e => setUnit(e.target.value)}>
                   <option>mg</option>
-                  <option>mL</option>
                   <option>g</option>
                   <option>mcg</option>
-                  <option>tablet</option>
-                  <option>capsule</option>
+                  <option>mL</option>
+                  <option>IU</option>
+                  <option>puff</option>
+                  <option>drop</option>
+                  <option>unit</option>
                 </select>
               </div>
             </div>
@@ -266,8 +268,9 @@ export default function MedicationsPage() {
                   <option>Tablet</option>
                   <option>Capsule</option>
                   <option>Liquid</option>
-                  <option>Inhaler</option>
                   <option>Injection</option>
+                  <option>Drops</option>
+                  <option>Other</option>
                 </select>
               </div>
               <div className="field-group">
