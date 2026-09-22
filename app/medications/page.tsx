@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { auth } from "../../lib/firebase"
 import { createMedication } from "../../lib/medications"
 
-function Icon({ type, size = 26 }: { type: "pill" | "close"; size?: number }) {
+function Icon({ type, size = 26 }: { type: "pill" | "close" | "warning"; size?: number }) {
   const common = {
     width: size,
     height: size,
@@ -22,12 +22,39 @@ function Icon({ type, size = 26 }: { type: "pill" | "close"; size?: number }) {
     return <svg {...common}><path d="M6 6l12 12M18 6L6 18" /></svg>
   }
 
+  if (type === "warning") {
+    return <svg {...common}><path d="M12 3 2.8 20h18.4L12 3Z" /><path d="M12 9v5" /><path d="M12 17.2h.01" /></svg>
+  }
+
   return <svg {...common}><rect x="7" y="2.8" width="10" height="18.4" rx="5" /><path d="M7 12h10" /></svg>
 }
 
 function todayKey() {
   const date = new Date()
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
+function isPastSchedule(dateValue: string, timeValue: string) {
+  if (!dateValue || !timeValue) return false
+  const now = new Date()
+  const [hours, minutes] = timeValue.split(":").map(Number)
+  const scheduled = new Date(`${dateValue}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`)
+  return scheduled <= now
+}
+
+function scheduleWarning(dateValue: string, timeValue: string) {
+  if (!dateValue) return "Please select a start date."
+  const today = todayKey()
+
+  if (dateValue < today) {
+    return "The start date cannot be in the past. Please choose today or a future date."
+  }
+
+  if (dateValue === today && isPastSchedule(dateValue, timeValue)) {
+    return "This schedule time has already passed today. Please choose a later time."
+  }
+
+  return ""
 }
 
 export default function MedicationsPage() {
@@ -46,9 +73,11 @@ export default function MedicationsPage() {
 
   useEffect(() => onAuthStateChanged(auth, user => setUid(user?.uid ?? null)), [])
 
+  const warning = scheduleWarning(startDate, time)
+
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!uid || !name.trim() || !time) return
+    if (!uid || !name.trim() || !time || warning) return
 
     setSaving(true)
     setMessage("")
@@ -66,8 +95,6 @@ export default function MedicationsPage() {
         notes: notes.trim(),
       })
 
-      // The web app only creates the medication schedule.
-      // It does NOT create or change a pending/taken/missed dose record.
       setMessage("Medication added successfully.")
       setTimeout(() => router.push("/dashboard"), 500)
     } catch (error) {
@@ -180,6 +207,22 @@ export default function MedicationsPage() {
           place-items: center;
           margin-bottom: 14px;
         }
+        .warning-box {
+          margin-top: 9px;
+          padding: 10px 12px;
+          border-radius: 14px;
+          background: #fff4e5;
+          border: 1px solid #f2c98c;
+          color: #9a5b00;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+          font-size: 12px;
+          line-height: 1.35;
+          font-weight: 700;
+        }
+        .warning-box svg { flex: 0 0 auto; margin-top: 1px; }
+        .invalid-field { border-color: #e5a94d !important; background: #fff9ef !important; }
         .create-button {
           width: 100%;
           height: 48px;
@@ -287,12 +330,14 @@ export default function MedicationsPage() {
 
             <div className="field-group">
               <label className="field-label">Times</label>
-              <input className="field" required type="time" value={time} onChange={e => setTime(e.target.value)} />
+              <input className={`field ${warning ? "invalid-field" : ""}`} required type="time" value={time} onChange={e => setTime(e.target.value)} />
+              {warning && <div className="warning-box"><Icon type="warning" size={17} /><span>{warning}</span></div>}
             </div>
 
             <div className="field-group">
               <label className="field-label">Start date</label>
-              <input className="field" required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              <input className={`field ${warning ? "invalid-field" : ""}`} required type="date" value={startDate} min={todayKey()} onChange={e => setStartDate(e.target.value)} />
+              {warning && <div className="warning-box"><Icon type="warning" size={17} /><span>{warning}</span></div>}
             </div>
 
             <div className="field-group">
@@ -302,7 +347,7 @@ export default function MedicationsPage() {
 
             {message && <div className="message">{message}</div>}
 
-            <button className="create-button" disabled={saving} type="submit">
+            <button className="create-button" disabled={saving || !!warning} type="submit">
               {saving ? "Creating..." : "Create medication"}
             </button>
           </form>
