@@ -21,6 +21,11 @@ export function getMedicationTime(medication: Medication): string {
   return medication.times?.["0"] ?? ""
 }
 
+function todayKey() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+}
+
 export async function createMedication(
   uid: string,
   medication: {
@@ -37,6 +42,9 @@ export async function createMedication(
 ) {
   const medicationRef = push(ref(realtimeDb, `medications/${uid}`))
   const now = Date.now()
+  const medicationId = medicationRef.key!
+  const startDate = medication.startDate ?? todayKey()
+  const time = medication.time
 
   const record = {
     active: medication.active,
@@ -46,20 +54,29 @@ export async function createMedication(
     frequency: medication.frequency ?? "Once Daily",
     name: medication.name,
     notes: medication.notes ?? "",
-    startDate: medication.startDate ?? "",
+    startDate,
     times: {
-      "0": medication.time,
+      "0": time,
     },
     unit: medication.unit,
     updatedAt: now,
     userId: uid,
   }
 
-  await set(medicationRef, record)
+  // Create the medication and its initial dose status together.
+  // The web app creates the schedule as PENDING, while the ESP32 changes
+  // the status to TAKEN or MISSED after the scheduled dose.
+  await set(ref(realtimeDb), {
+    [`medications/${uid}/${medicationId}`]: record,
+    [`doseStatus/${uid}/${medicationId}/${startDate}/${time}`]: {
+      status: "pending",
+      updatedAt: now,
+    },
+  })
 
   return {
     ...record,
-    id: medicationRef.key!,
+    id: medicationId,
   }
 }
 
