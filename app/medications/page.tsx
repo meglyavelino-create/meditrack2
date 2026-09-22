@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react"
 import { onAuthStateChanged } from "firebase/auth"
-import { auth, realtimeDb } from "../../lib/firebase"
+import { auth } from "../../lib/firebase"
 import { createMedication } from "../../lib/medications"
 import { createPendingDose } from "../../lib/dose-status"
 
@@ -23,8 +23,18 @@ export default function MedicationsPage() {
     setSaving(true)
     setMessage("")
     try {
-      const medicationId = await createMedication(uid, { name: name.trim(), dosage: dosage.trim(), unit, time, active: true })
-      await createPendingDose(uid, medicationId, time)
+      const medication = await createMedication(uid, {
+        name: name.trim(),
+        dosage: dosage.trim(),
+        unit,
+        time,
+        active: true,
+      })
+
+      // Only the initial dose is created by the web app. After this,
+      // the ESP32 is responsible for changing status and updatedAt.
+      await createPendingDose(uid, medication.id, time)
+
       setName("")
       setDosage("")
       setTime("")
