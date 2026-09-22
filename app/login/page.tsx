@@ -35,37 +35,43 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col bg-background">
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-8 py-12">
-        <span className="flex size-16 items-center justify-center rounded-2xl bg-primary-soft text-primary">
-          <HeartPulse className="size-8" strokeWidth={2} />
-        </span>
+    <main className="min-h-dvh bg-[#eef6f3]">
+      <div className="mx-auto flex min-h-dvh w-full max-w-[380px] flex-col justify-center px-4 py-10">
+        <div className="w-full">
+          <div className="flex h-[58px] w-[58px] items-center justify-center rounded-[18px] bg-[#d9efe6] text-[#43ad7e]">
+            <HeartPulse className="h-[31px] w-[31px]" strokeWidth={2.1} />
+          </div>
 
-        <h1 className="mt-6 text-4xl font-bold tracking-tight text-foreground">MediTrack</h1>
-        <p className="mt-2 max-w-xs text-base leading-relaxed text-muted-foreground">
-          Never miss a dose. Track every intake with confidence.
-        </p>
+          <h1 className="mt-5 text-[34px] font-bold leading-[1.12] tracking-[-0.8px] text-[#142535]">
+            MediTrack
+          </h1>
 
-        <button
-          onClick={signInWithGoogle}
-          disabled={busy}
-          className="mt-10 flex w-full items-center justify-center gap-3 rounded-full bg-primary py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition active:scale-[0.99] disabled:opacity-70"
-        >
-          <span className="flex size-6 items-center justify-center rounded-full bg-white">
-            <GoogleGlyph />
-          </span>
-          {busy ? "Signing in…" : "Continue with Google"}
-        </button>
-
-        {error && (
-          <p role="alert" className="mt-4 rounded-xl bg-destructive/10 px-4 py-2.5 text-sm font-medium text-destructive">
-            {error}
+          <p className="mt-2 max-w-[330px] text-[15px] leading-[1.55] text-[#61798d]">
+            Never miss a dose. Track every intake with confidence.
           </p>
-        )}
 
-        <p className="mt-8 text-center text-xs leading-relaxed text-muted-foreground">
-          By continuing you agree to the MediTrack terms of use and privacy policy.
-        </p>
+          <button
+            type="button"
+            onClick={signInWithGoogle}
+            disabled={busy}
+            className="mt-9 flex h-[51px] w-full items-center justify-center gap-2.5 rounded-full bg-[#43ad7e] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(67,173,126,0.24)] transition hover:bg-[#3ca574] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <span className="flex h-[23px] w-[23px] items-center justify-center rounded-full bg-white">
+              <GoogleGlyph />
+            </span>
+            {busy ? "Signing in…" : "Continue with Google"}
+          </button>
+
+          {error && (
+            <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
+              {error}
+            </p>
+          )}
+
+          <p className="mx-auto mt-7 max-w-[330px] text-center text-[10px] leading-[1.55] text-[#71899b]">
+            By continuing you agree to the MediTrack terms of use and privacy policy.
+          </p>
+        </div>
       </div>
     </main>
   )
@@ -73,7 +79,7 @@ export default function LoginPage() {
 
 function GoogleGlyph() {
   return (
-    <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
+    <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" aria-hidden="true">
       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
       <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
