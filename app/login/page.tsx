@@ -34,44 +34,129 @@ export default function LoginPage() {
     }
   }
 
+  const styles = {
+    main: {
+      minHeight: "100dvh",
+      width: "100%",
+      background: "#eef6f3",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "40px 24px",
+      boxSizing: "border-box" as const,
+    },
+    card: {
+      width: "100%",
+      maxWidth: "380px",
+      boxSizing: "border-box" as const,
+    },
+    iconBox: {
+      width: "58px",
+      height: "58px",
+      borderRadius: "18px",
+      background: "#d9efe6",
+      color: "#43ad7e",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    title: {
+      margin: "20px 0 0",
+      fontSize: "34px",
+      lineHeight: "1.12",
+      fontWeight: 700,
+      letterSpacing: "-0.8px",
+      color: "#142535",
+    },
+    subtitle: {
+      margin: "8px 0 0",
+      maxWidth: "330px",
+      fontSize: "15px",
+      lineHeight: 1.55,
+      color: "#61798d",
+    },
+    button: {
+      marginTop: "36px",
+      width: "100%",
+      height: "51px",
+      border: "none",
+      borderRadius: "999px",
+      background: "#43ad7e",
+      color: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+      padding: "0 20px",
+      fontSize: "15px",
+      fontWeight: 600,
+      cursor: busy ? "not-allowed" : "pointer",
+      opacity: busy ? 0.7 : 1,
+      boxShadow: "0 8px 18px rgba(67,173,126,0.24)",
+    },
+    googleCircle: {
+      width: "23px",
+      height: "23px",
+      borderRadius: "50%",
+      background: "white",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    },
+    error: {
+      margin: "16px 0 0",
+      padding: "10px 14px",
+      borderRadius: "12px",
+      background: "#fff0f0",
+      color: "#dc2626",
+      fontSize: "14px",
+      fontWeight: 500,
+    },
+    terms: {
+      margin: "28px auto 0",
+      maxWidth: "330px",
+      textAlign: "center" as const,
+      fontSize: "10px",
+      lineHeight: 1.55,
+      color: "#71899b",
+    },
+  }
+
   return (
-    <main className="min-h-dvh bg-[#eef6f3]">
-      <div className="mx-auto flex min-h-dvh w-full max-w-[380px] flex-col justify-center px-4 py-10">
-        <div className="w-full">
-          <div className="flex h-[58px] w-[58px] items-center justify-center rounded-[18px] bg-[#d9efe6] text-[#43ad7e]">
-            <HeartPulse className="h-[31px] w-[31px]" strokeWidth={2.1} />
-          </div>
-
-          <h1 className="mt-5 text-[34px] font-bold leading-[1.12] tracking-[-0.8px] text-[#142535]">
-            MediTrack
-          </h1>
-
-          <p className="mt-2 max-w-[330px] text-[15px] leading-[1.55] text-[#61798d]">
-            Never miss a dose. Track every intake with confidence.
-          </p>
-
-          <button
-            type="button"
-            onClick={signInWithGoogle}
-            disabled={busy}
-            className="mt-9 flex h-[51px] w-full items-center justify-center gap-2.5 rounded-full bg-[#43ad7e] px-5 text-[15px] font-semibold text-white shadow-[0_8px_18px_rgba(67,173,126,0.24)] transition hover:bg-[#3ca574] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            <span className="flex h-[23px] w-[23px] items-center justify-center rounded-full bg-white">
-              <GoogleGlyph />
-            </span>
-            {busy ? "Signing in…" : "Continue with Google"}
-          </button>
-
-          {error && (
-            <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-600">
-              {error}
-            </p>
-          )}
-
-          <p className="mx-auto mt-7 max-w-[330px] text-center text-[10px] leading-[1.55] text-[#71899b]">
-            By continuing you agree to the MediTrack terms of use and privacy policy.
-          </p>
+    <main style={styles.main}>
+      <div style={styles.card}>
+        <div style={styles.iconBox}>
+          <HeartPulse style={{ width: 31, height: 31 }} strokeWidth={2.1} />
         </div>
+
+        <h1 style={styles.title}>MediTrack</h1>
+
+        <p style={styles.subtitle}>
+          Never miss a dose. Track every intake with confidence.
+        </p>
+
+        <button
+          type="button"
+          onClick={signInWithGoogle}
+          disabled={busy}
+          style={styles.button}
+        >
+          <span style={styles.googleCircle}>
+            <GoogleGlyph />
+          </span>
+          {busy ? "Signing in…" : "Continue with Google"}
+        </button>
+
+        {error && (
+          <p role="alert" style={styles.error}>
+            {error}
+          </p>
+        )}
+
+        <p style={styles.terms}>
+          By continuing you agree to the MediTrack terms of use and privacy policy.
+        </p>
       </div>
     </main>
   )
@@ -79,7 +164,7 @@ export default function LoginPage() {
 
 function GoogleGlyph() {
   return (
-    <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" aria-hidden="true">
+    <svg viewBox="0 0 24 24" style={{ width: 15, height: 15 }} aria-hidden="true">
       <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
       <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
