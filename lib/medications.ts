@@ -17,6 +17,10 @@ export type Medication = {
   userId?: string
 }
 
+export function getMedicationTime(medication: Medication): string {
+  return medication.times?.["0"] ?? ""
+}
+
 export async function createMedication(
   uid: string,
   medication: {
@@ -34,8 +38,6 @@ export async function createMedication(
   const medicationRef = push(ref(realtimeDb, `medications/${uid}`))
   const now = Date.now()
 
-  // Original MediTrack Firebase structure.
-  // One medication ID has exactly one scheduled time at times/0.
   const record = {
     active: medication.active,
     createdAt: now,
