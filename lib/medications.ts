@@ -9,6 +9,10 @@ export type Medication = {
   time: string
   active: boolean
   createdAt: number
+  form?: string
+  frequency?: string
+  startDate?: string
+  notes?: string
 }
 
 export async function createMedication(uid: string, medication: Omit<Medication, "id" | "createdAt">) {
