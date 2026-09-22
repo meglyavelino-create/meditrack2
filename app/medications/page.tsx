@@ -35,7 +35,7 @@ export default function MedicationsPage() {
   const router = useRouter()
   const [uid, setUid] = useState<string | null>(null)
   const [name, setName] = useState("")
-  const [dosage, setDosage] = useState("500")
+  const [dosage, setDosage] = useState("")
   const [unit, setUnit] = useState("mg")
   const [form, setForm] = useState("Tablet")
   const [frequency, setFrequency] = useState("Once Daily")
