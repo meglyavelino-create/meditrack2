@@ -1,4 +1,4 @@
-import { push, ref, remove, set } from "firebase/database"
+import { push, ref, remove, update } from "firebase/database"
 import { realtimeDb } from "./firebase"
 
 export type Medication = {
@@ -64,9 +64,10 @@ export async function createMedication(
   }
 
   // Create the medication and its initial dose status together.
-  // The web app creates the schedule as PENDING, while the ESP32 changes
-  // the status to TAKEN or MISSED after the scheduled dose.
-  await set(ref(realtimeDb), {
+  // The web app creates the dose as PENDING. The ESP32 is responsible
+  // for changing that dose to TAKEN or MISSED later.
+  // update() is used so existing Firebase data is never overwritten.
+  await update(ref(realtimeDb), {
     [`medications/${uid}/${medicationId}`]: record,
     [`doseStatus/${uid}/${medicationId}/${startDate}/${time}`]: {
       status: "pending",
