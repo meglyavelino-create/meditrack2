@@ -7,19 +7,41 @@ import { auth } from "../../lib/firebase"
 import { createMedication } from "../../lib/medications"
 import { createPendingDose } from "../../lib/dose-status"
 
-function Icon({ type, size = 26 }: { type: "pill" | "back"; size?: number }) {
-  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
-  if (type === "back") return <svg {...common}><path d="m15 18-6-6 6-6" /></svg>
-  return <svg {...common}><rect x="7" y="2.8" width="10" height="18.4" rx="5"/><path d="M7 12h10"/></svg>
+function Icon({ type, size = 26 }: { type: "pill" | "close"; size?: number }) {
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  }
+
+  if (type === "close") {
+    return <svg {...common}><path d="M6 6l12 12M18 6L6 18" /></svg>
+  }
+
+  return <svg {...common}><rect x="7" y="2.8" width="10" height="18.4" rx="5" /><path d="M7 12h10" /></svg>
+}
+
+function todayKey() {
+  const date = new Date()
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
 }
 
 export default function MedicationsPage() {
   const router = useRouter()
   const [uid, setUid] = useState<string | null>(null)
   const [name, setName] = useState("")
-  const [dosage, setDosage] = useState("")
+  const [dosage, setDosage] = useState("500")
   const [unit, setUnit] = useState("mg")
-  const [time, setTime] = useState("")
+  const [form, setForm] = useState("Tablet")
+  const [frequency, setFrequency] = useState("Once Daily")
+  const [time, setTime] = useState("08:00")
+  const [startDate, setStartDate] = useState(todayKey())
+  const [notes, setNotes] = useState("")
   const [message, setMessage] = useState("")
   const [saving, setSaving] = useState(false)
 
@@ -28,52 +50,257 @@ export default function MedicationsPage() {
   async function submit(event: FormEvent) {
     event.preventDefault()
     if (!uid || !name.trim() || !time) return
+
     setSaving(true)
     setMessage("")
+
     try {
-      const medication = await createMedication(uid, { name: name.trim(), dosage: dosage.trim(), unit, time, active: true })
+      const medication = await createMedication(uid, {
+        name: name.trim(),
+        dosage: dosage.trim(),
+        unit,
+        time,
+        active: true,
+        form,
+        frequency,
+        startDate,
+        notes: notes.trim(),
+      })
+
       await createPendingDose(uid, medication.id, time)
       setMessage("Medication added successfully.")
       setTimeout(() => router.push("/dashboard"), 500)
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to save medication.")
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!uid) return null
 
   return (
-    <main style={{ minHeight: "100vh", background: "#edf5f2", color: "#142234", paddingBottom: 90, fontFamily: "Arial, Helvetica, sans-serif" }}>
-      <style>{`*{box-sizing:border-box}@media(max-width:600px){.med-wrap{padding-left:16px!important;padding-right:16px!important}.med-title{font-size:34px!important}.med-card{padding:22px 18px!important}.med-grid{grid-template-columns:1fr!important}}`}</style>
-      <header style={{ background: "white", borderBottom: "1px solid #dce8e4" }}>
-        <div className="med-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "34px 22px 27px", display: "flex", alignItems: "center", gap: 16 }}>
-          <button onClick={() => router.back()} aria-label="Back" style={{ width: 46, height: 46, border: 0, borderRadius: "50%", background: "#e7f1ed", color: "#5f7382", display: "grid", placeItems: "center", cursor: "pointer" }}><Icon type="back" /></button>
-          <div><h1 className="med-title" style={{ margin: 0, fontSize: 38, fontWeight: 800, letterSpacing: -1 }}>Add medication</h1><p style={{ margin: "7px 0 0", color: "#71808e", fontSize: 16 }}>Create a dose schedule for your MediTrack.</p></div>
+    <main className="modal-page">
+      <style>{`
+        * { box-sizing: border-box; }
+        html, body { margin: 0; }
+        .modal-page {
+          min-height: 100vh;
+          background: #edf5f2;
+          color: #142234;
+          font-family: Arial, Helvetica, sans-serif;
+          position: relative;
+          overflow: hidden;
+        }
+        .fake-dashboard {
+          position: absolute;
+          inset: 0;
+          filter: blur(5px);
+          opacity: .62;
+          pointer-events: none;
+        }
+        .fake-header {
+          height: 144px;
+          background: white;
+          border-bottom: 1px solid #dce8e4;
+          padding: 42px 30px;
+        }
+        .fake-inner { max-width: 760px; margin: 0 auto; }
+        .fake-title { font-size: 38px; font-weight: 800; }
+        .fake-subtitle { color: #71808e; margin-top: 8px; }
+        .fake-green {
+          margin-top: 30px;
+          height: 205px;
+          border-radius: 30px;
+          background: #45ae80;
+        }
+        .fake-stats {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 15px;
+          margin-top: 24px;
+        }
+        .fake-stat { height: 135px; background: white; border-radius: 25px; }
+        .fake-bottom {
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 76px;
+          background: white;
+        }
+        .overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(83, 96, 101, .58);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 24px;
+          z-index: 10;
+        }
+        .modal-card {
+          width: min(405px, calc(100vw - 32px));
+          max-height: calc(100vh - 28px);
+          overflow-y: auto;
+          background: #fff;
+          border-radius: 28px;
+          padding: 22px 22px 20px;
+          box-shadow: 0 24px 60px rgba(20, 34, 52, .22);
+          position: relative;
+        }
+        .modal-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .modal-title { margin: 0; font-size: 21px; line-height: 1.15; font-weight: 800; }
+        .modal-subtitle { margin: 8px 0 0; color: #71808e; font-size: 13px; line-height: 1.35; }
+        .close-button {
+          width: 32px;
+          height: 32px;
+          border: 0;
+          background: transparent;
+          color: #71808e;
+          display: grid;
+          place-items: center;
+          cursor: pointer;
+          margin: -4px -4px 0 8px;
+        }
+        .field-label { display: block; font-size: 13px; font-weight: 800; margin-bottom: 7px; }
+        .field { width: 100%; height: 42px; border: 1px solid #dce7e3; border-radius: 22px; padding: 0 14px; background: #edf4f1; color: #263847; font-size: 14px; outline: none; }
+        .field:focus { border-color: #45ae80; box-shadow: 0 0 0 2px rgba(69,174,128,.12); }
+        .textarea { height: 72px; padding-top: 12px; resize: vertical; border-radius: 18px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .modal-form { margin-top: 18px; }
+        .field-group { margin-top: 13px; }
+        .pill-icon {
+          width: 58px;
+          height: 58px;
+          border-radius: 50%;
+          background: #e3eef9;
+          color: #4d79a7;
+          display: grid;
+          place-items: center;
+          margin-bottom: 14px;
+        }
+        .create-button {
+          width: 100%;
+          height: 48px;
+          border: 0;
+          border-radius: 25px;
+          background: #45ae80;
+          color: white;
+          font-size: 15px;
+          font-weight: 800;
+          cursor: pointer;
+          margin-top: 18px;
+          box-shadow: 0 5px 12px rgba(57,145,107,.18);
+        }
+        .create-button:disabled { opacity: .65; cursor: not-allowed; }
+        .message { margin-top: 12px; padding: 10px 12px; border-radius: 14px; font-size: 12px; font-weight: 700; background: #e2f3eb; color: #398f6c; }
+        @media (max-width: 600px) {
+          .overlay { align-items: center; padding: 12px; }
+          .modal-card { width: min(405px, calc(100vw - 24px)); max-height: calc(100vh - 24px); padding: 20px 18px 18px; }
+          .modal-title { font-size: 20px; }
+          .field { height: 44px; }
+        }
+      `}</style>
+
+      <div className="fake-dashboard">
+        <div className="fake-header">
+          <div className="fake-inner">
+            <div className="fake-title">Hi, Gly</div>
+            <div className="fake-subtitle">Here's your plan for today</div>
+          </div>
         </div>
-      </header>
-      <div className="med-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "30px 22px" }}>
-        <form onSubmit={submit} className="med-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, boxShadow: "0 5px 18px rgba(20,34,52,.04)" }}>
-          <div style={{ width: 66, height: 66, borderRadius: "50%", background: "#e3eef9", color: "#4d79a7", display: "grid", placeItems: "center", marginBottom: 24 }}><Icon type="pill" size={31} /></div>
-          <label style={{ display: "block", fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Medication name</label>
-          <input required placeholder="e.g. Paracetamol" value={name} onChange={e => setName(e.target.value)} style={{ width: "100%", height: 52, border: "1px solid #d6e1de", borderRadius: 18, padding: "0 17px", fontSize: 16, outline: "none", background: "#f8fbfa" }} />
-          <div className="med-grid" style={{ display: "grid", gridTemplateColumns: "1fr 150px", gap: 12, marginTop: 20 }}>
-            <div><label style={{ display: "block", fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Dosage</label><input placeholder="300" value={dosage} onChange={e => setDosage(e.target.value)} style={{ width: "100%", height: 52, border: "1px solid #d6e1de", borderRadius: 18, padding: "0 17px", fontSize: 16, outline: "none", background: "#f8fbfa" }} /></div>
-            <div><label style={{ display: "block", fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Unit</label><select value={unit} onChange={e => setUnit(e.target.value)} style={{ width: "100%", height: 52, border: "1px solid #d6e1de", borderRadius: 18, padding: "0 13px", fontSize: 16, outline: "none", background: "#f8fbfa" }}><option>mg</option><option>mL</option><option>tablet</option><option>capsule</option></select></div>
+        <div className="fake-inner">
+          <div className="fake-green" />
+          <div className="fake-stats">
+            <div className="fake-stat" />
+            <div className="fake-stat" />
+            <div className="fake-stat" />
           </div>
-          <div style={{ marginTop: 20 }}><label style={{ display: "block", fontWeight: 800, fontSize: 15, marginBottom: 8 }}>Schedule time</label><input required type="time" value={time} onChange={e => setTime(e.target.value)} style={{ width: "100%", height: 52, border: "1px solid #d6e1de", borderRadius: 18, padding: "0 17px", fontSize: 16, outline: "none", background: "#f8fbfa" }} /></div>
-          {message && <div style={{ marginTop: 20, padding: "12px 15px", borderRadius: 15, background: message.includes("successfully") ? "#e2f3eb" : "#fff0f0", color: message.includes("successfully") ? "#398f6c" : "#c53f49", fontWeight: 700 }}>{message}</div>}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 25 }}>
-            <button type="button" onClick={() => router.back()} style={{ height: 52, border: "1px solid #d6e1de", borderRadius: 18, background: "white", color: "#607382", fontSize: 16, fontWeight: 800, cursor: "pointer" }}>Cancel</button>
-            <button disabled={saving} type="submit" style={{ height: 52, border: 0, borderRadius: 18, background: "#45ae80", color: "white", fontSize: 16, fontWeight: 800, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .7 : 1 }}>{saving ? "Saving..." : "Create medication"}</button>
-          </div>
-        </form>
+        </div>
+        <div className="fake-bottom" />
       </div>
-      <BottomNav router={router} />
+
+      <div className="overlay">
+        <section className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-medication-title">
+          <div className="modal-top">
+            <div>
+              <h1 id="add-medication-title" className="modal-title">Add medication</h1>
+              <p className="modal-subtitle">A few details and your medicine plan is ready.</p>
+            </div>
+            <button className="close-button" type="button" onClick={() => router.back()} aria-label="Close">
+              <Icon type="close" size={21} />
+            </button>
+          </div>
+
+          <form className="modal-form" onSubmit={submit}>
+            <div className="pill-icon"><Icon type="pill" size={28} /></div>
+
+            <div className="field-group" style={{ marginTop: 0 }}>
+              <label className="field-label">Medication name</label>
+              <input className="field" required placeholder="e.g. Metformin" value={name} onChange={e => setName(e.target.value)} />
+            </div>
+
+            <div className="form-grid">
+              <div className="field-group">
+                <label className="field-label">Dosage</label>
+                <input className="field" inputMode="decimal" placeholder="500" value={dosage} onChange={e => setDosage(e.target.value)} />
+              </div>
+              <div className="field-group">
+                <label className="field-label">Unit</label>
+                <select className="field" value={unit} onChange={e => setUnit(e.target.value)}>
+                  <option>mg</option>
+                  <option>mL</option>
+                  <option>g</option>
+                  <option>mcg</option>
+                  <option>tablet</option>
+                  <option>capsule</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-grid">
+              <div className="field-group">
+                <label className="field-label">Form</label>
+                <select className="field" value={form} onChange={e => setForm(e.target.value)}>
+                  <option>Tablet</option>
+                  <option>Capsule</option>
+                  <option>Liquid</option>
+                  <option>Inhaler</option>
+                  <option>Injection</option>
+                </select>
+              </div>
+              <div className="field-group">
+                <label className="field-label">Frequency</label>
+                <select className="field" value={frequency} onChange={e => setFrequency(e.target.value)}>
+                  <option>Once Daily</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="field-group">
+              <label className="field-label">Times</label>
+              <input className="field" required type="time" value={time} onChange={e => setTime(e.target.value)} />
+            </div>
+
+            <div className="field-group">
+              <label className="field-label">Start date</label>
+              <input className="field" required type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+            </div>
+
+            <div className="field-group">
+              <label className="field-label">Notes (optional)</label>
+              <textarea className="field textarea" placeholder="e.g. Take with food" value={notes} onChange={e => setNotes(e.target.value)} />
+            </div>
+
+            {message && <div className="message">{message}</div>}
+
+            <button className="create-button" disabled={saving} type="submit">
+              {saving ? "Creating..." : "Create medication"}
+            </button>
+          </form>
+        </section>
+      </div>
     </main>
   )
-}
-
-function BottomNav({ router }: { router: ReturnType<typeof useRouter> }) {
-  const items = [{label:"Home",path:"/dashboard",icon:"⌂"},{label:"Schedule",path:"/schedule",icon:"□"},{label:"History",path:"/history",icon:"↶"},{label:"Profile",path:"/profile",icon:"♙"}]
-  return <nav style={{ position:"fixed",left:0,right:0,bottom:0,height:76,background:"rgba(255,255,255,.98)",borderTop:"1px solid #dce7e3",display:"flex",justifyContent:"center",zIndex:20 }}><div style={{width:"100%",maxWidth:760,display:"grid",gridTemplateColumns:"repeat(4,1fr)"}}>{items.map(item=><button key={item.label} onClick={()=>router.push(item.path)} style={{border:0,background:"transparent",color:"#657786",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,cursor:"pointer",fontWeight:500}}><span style={{fontSize:25,lineHeight:1}}>{item.icon}</span><span style={{fontSize:13}}>{item.label}</span></button>)}</div></nav>
 }
