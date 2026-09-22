@@ -63,8 +63,12 @@ export default function DashboardPage() {
     }, e => setError(e.message))
   }, [user])
 
+  // IMPORTANT:
+  // Build the dashboard from TODAY'S date only. A dose taken or missed
+  // yesterday belongs to History and must never be reused as today's status.
+  // If today's dose has no status record yet, it is a new pending dose.
   const todayDate = todayKey(now)
-  const today = useMemo(() => medications
+  const todayAll = useMemo(() => medications
     .filter(m => m.active !== false && (!m.startDate || m.startDate <= todayDate))
     .map(m => {
       const time = getMedicationTime(m)
@@ -74,11 +78,15 @@ export default function DashboardPage() {
     .filter(d => !!d.time)
     .sort((a, b) => mins(a.time) - mins(b.time)), [medications, statusTree, todayDate])
 
-  const taken = today.filter(d => d.status === "taken").length
-  const missed = today.filter(d => d.status === "missed").length
+  // Dashboard "Today's doses" now shows ONLY doses that still need action.
+  // Taken and missed doses remain available in the History page.
+  const pendingToday = useMemo(() => todayAll.filter(d => d.status === "pending"), [todayAll])
+
+  const taken = todayAll.filter(d => d.status === "taken").length
+  const missed = todayAll.filter(d => d.status === "missed").length
   const adherence = missed === 0 ? 100 : Math.round(taken / (taken + missed) * 100)
   const current = now.getHours() * 60 + now.getMinutes()
-  const next = today.find(d => d.status === "pending" && mins(d.time) >= current) || today.find(d => d.status === "pending")
+  const next = pendingToday.find(d => mins(d.time) >= current) || pendingToday[0]
 
   const countdown = useMemo(() => {
     if (!next) return "0h 00m"
@@ -101,7 +109,7 @@ export default function DashboardPage() {
       <section className="mt-next" style={{ background: "#45ae80", borderRadius: 30, padding: "32px 30px 25px", color: "white", boxShadow: "0 12px 25px rgba(55,145,106,.15)" }}><div style={{ fontSize: 16, fontWeight: 800, letterSpacing: 1.1 }}>NEXT DOSE IN</div><div className="mt-count" style={{ fontSize: 64, lineHeight: 1.05, fontWeight: 800, margin: "8px 0 20px" }}>{countdown}</div>{next ? <div style={{ background: "rgba(255,255,255,.19)", borderRadius: 23, padding: "17px 19px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}><div style={{ minWidth: 0 }}><div style={{ fontSize: 23, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{next.medication.name}</div><div style={{ marginTop: 4, fontSize: 17 }}>{next.medication.dosage} {next.medication.unit}</div></div><div style={{ background: "rgba(255,255,255,.25)", padding: "9px 15px", borderRadius: 28, fontSize: 18, fontWeight: 800 }}>{formatTime(next.time)}</div></div> : <div style={{ background: "rgba(255,255,255,.17)", borderRadius: 20, padding: 18 }}>No pending doses for today.</div>}</section>
       <section style={{ display: "grid", gridTemplateColumns: "repeat(3,minmax(0,1fr))", gap: 15, marginTop: 24 }}>{[{ icon: "check" as const, value: taken, label: "Taken", color: "#3aa87d" }, { icon: "clock" as const, value: missed, label: "Missed", color: "#df5d64" }, { icon: "trend" as const, value: `${adherence}%`, label: "Adherence", color: "#3c6ea4" }].map(x => <div className="mt-stat" key={x.label} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 26, padding: "21px 18px", minHeight: 135 }}><div style={{ color: x.color, marginBottom: 11 }}><Icon type={x.icon} size={27} /></div><div className="mt-stat-value" style={{ fontSize: 37, fontWeight: 800 }}>{x.value}</div><div style={{ color: "#73818d", fontSize: 17, marginTop: 9 }}>{x.label}</div></div>)}</section>
       <h2 style={{ margin: "34px 0 17px", fontSize: 27 }}>Today's doses</h2>
-      {loading ? <div style={{ background: "white", borderRadius: 23, padding: 26, color: "#71808e" }}>Loading your medications...</div> : today.length === 0 ? <div style={{ background: "white", borderRadius: 24, padding: 28, textAlign: "center" }}><div style={{ fontSize: 20, fontWeight: 800 }}>No medications yet</div><p style={{ color: "#71808e" }}>Add your first medication schedule to start tracking doses.</p><button onClick={() => router.push("/medications")} style={{ border: 0, background: "#45ae80", color: "white", borderRadius: 18, padding: "12px 20px", fontWeight: 800 }}>Add medication</button></div> : <div style={{ display: "grid", gap: 12 }}>{today.map(({ medication, time, status }) => { const td = status === "taken", md = status === "missed"; return <article className="mt-dose" key={medication.id} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 25, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 57, height: 57, borderRadius: "50%", background: "#e3eef9", color: "#4d79a7", display: "grid", placeItems: "center" }}><Icon type="pill" size={27} /></div><div style={{ minWidth: 0, flex: 1 }}><div className="mt-dose-name" style={{ fontWeight: 800, fontSize: 20 }}>{medication.name}</div><div style={{ color: "#71808e", fontSize: 16, marginTop: 3 }}>{medication.dosage} {medication.unit} · {formatTime(time)}</div></div><div style={{ background: td ? "#dff2e9" : md ? "#fde6e6" : "#eef1f2", color: td ? "#3b9f78" : md ? "#cf5058" : "#667784", borderRadius: 22, padding: "9px 13px", fontWeight: 800, fontSize: 15 }}>{td ? "✓ Taken" : md ? "Missed" : "◷ Pending"}</div></article> })}</div>}
+      {loading ? <div style={{ background: "white", borderRadius: 23, padding: 26, color: "#71808e" }}>Loading your medications...</div> : pendingToday.length === 0 ? <div style={{ background: "white", borderRadius: 24, padding: 28, textAlign: "center" }}><div style={{ fontSize: 20, fontWeight: 800 }}>{todayAll.length > 0 ? "No pending doses for today" : "No medications yet"}</div><p style={{ color: "#71808e" }}>{todayAll.length > 0 ? "Taken and missed doses are kept in History." : "Add your first medication schedule to start tracking doses."}</p>{todayAll.length === 0 && <button onClick={() => router.push("/medications")} style={{ border: 0, background: "#45ae80", color: "white", borderRadius: 18, padding: "12px 20px", fontWeight: 800 }}>Add medication</button>}</div> : <div style={{ display: "grid", gap: 12 }}>{pendingToday.map(({ medication, time }) => <article className="mt-dose" key={medication.id} style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 25, padding: "16px 18px", display: "flex", alignItems: "center", gap: 14 }}><div style={{ width: 57, height: 57, borderRadius: "50%", background: "#e3eef9", color: "#4d79a7", display: "grid", placeItems: "center" }}><Icon type="pill" size={27} /></div><div style={{ minWidth: 0, flex: 1 }}><div className="mt-dose-name" style={{ fontWeight: 800, fontSize: 20 }}>{medication.name}</div><div style={{ color: "#71808e", fontSize: 16, marginTop: 3 }}>{medication.dosage} {medication.unit} · {formatTime(time)}</div></div><div style={{ background: "#eef1f2", color: "#667784", borderRadius: 22, padding: "9px 13px", fontWeight: 800, fontSize: 15 }}>◷ Pending</div></article>)}</div>}
     </div>
     <nav className="mt-bottom" style={{ position: "fixed", left: 0, right: 0, bottom: 0, height: 76, background: "rgba(255,255,255,.98)", borderTop: "1px solid #dce7e3", display: "flex", justifyContent: "center", zIndex: 20 }}><div style={{ width: "100%", maxWidth: 760, display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>{[{ label: "Home", icon: "home" as const, path: "/dashboard" }, { label: "Schedule", icon: "calendar" as const, path: "/schedule" }, { label: "History", icon: "history" as const, path: "/history" }, { label: "Profile", icon: "profile" as const, path: "/profile" }].map(x => <button key={x.label} onClick={() => router.push(x.path)} style={{ border: 0, background: "transparent", color: x.label === "Home" ? "#3eaa7d" : "#657786", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 3, fontWeight: x.label === "Home" ? 800 : 500, cursor: "pointer" }}><Icon type={x.icon} size={27} /><span style={{ fontSize: 13 }}>{x.label}</span></button>)}</div></nav>
   </main>
