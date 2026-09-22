@@ -5,7 +5,7 @@ import { onValue, ref } from "firebase/database"
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { auth, realtimeDb } from "../../lib/firebase"
-import { deleteMedication, getMedicationTime, type Medication, updateMedication } from "../../lib/medications"
+import { deleteMedication, getMedicationTime, markExpiredPendingDoses, type Medication, updateMedication } from "../../lib/medications"
 
 type DoseStatus = "pending" | "taken" | "missed"
 type EditableDose = { medication: Medication; time: string; status: "pending" | "missed"; date: string }
@@ -70,6 +70,20 @@ export default function SchedulePage() {
     if (!uid) { setStatusTree({}); return }
     return onValue(ref(realtimeDb, `doseStatus/${uid}`), s => setStatusTree(s.val() || {}), e => setError(e.message))
   }, [uid])
+
+  // Fallback when the ESP32 is off: mark doses missed after 10 minutes.
+  useEffect(() => {
+    if (!uid || medications.length === 0) return
+    let cancelled = false
+    const run = async () => {
+      if (cancelled) return
+      try { await markExpiredPendingDoses(uid, medications, statusTree) }
+      catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : "Unable to update expired doses.") }
+    }
+    void run()
+    const timer = window.setInterval(() => void run(), 30000)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [uid, medications, statusTree])
 
   const selectedKey = dateKey(selectedDate)
   const active = useMemo(() => medications
