@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { auth, realtimeDb } from "../../lib/firebase"
 import type { Medication } from "../../lib/medications"
-import { getMedicationTime } from "../../lib/medications"
+import { getMedicationTime, markExpiredPendingDoses } from "../../lib/medications"
 
 type DoseStatus = "pending" | "taken" | "missed"
 type UserInfo = { uid: string; name: string; email: string }
@@ -54,7 +54,6 @@ export default function DashboardPage() {
     }, e => { setError(e.message); setLoading(false) })
   }, [user])
 
-  // Read-only listener. The web app never writes this branch.
   useEffect(() => {
     if (!user) { setStatusTree({}); return }
     const statusRef = ref(realtimeDb, `doseStatus/${user.uid}`)
@@ -63,10 +62,16 @@ export default function DashboardPage() {
     }, e => setError(e.message))
   }, [user])
 
-  // IMPORTANT:
-  // Build the dashboard from TODAY'S date only. A dose taken or missed
-  // yesterday belongs to History and must never be reused as today's status.
-  // If today's dose has no status record yet, it is a new pending dose.
+  // Fallback when the ESP32 is powered off or disconnected.
+  // Any pending dose that is at least 10 minutes past its scheduled time
+  // is recorded as missed by the web app.
+  useEffect(() => {
+    if (!user || medications.length === 0) return
+    void markExpiredPendingDoses(user.uid, medications, statusTree).catch(e => {
+      setError(e instanceof Error ? e.message : "Unable to update expired doses.")
+    })
+  }, [user, medications, statusTree])
+
   const todayDate = todayKey(now)
   const todayAll = useMemo(() => medications
     .filter(m => m.active !== false && (!m.startDate || m.startDate <= todayDate))
@@ -78,8 +83,6 @@ export default function DashboardPage() {
     .filter(d => !!d.time)
     .sort((a, b) => mins(a.time) - mins(b.time)), [medications, statusTree, todayDate])
 
-  // Dashboard "Today's doses" now shows ONLY doses that still need action.
-  // Taken and missed doses remain available in the History page.
   const pendingToday = useMemo(() => todayAll.filter(d => d.status === "pending"), [todayAll])
 
   const taken = todayAll.filter(d => d.status === "taken").length
