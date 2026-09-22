@@ -1,12 +1,11 @@
 "use client"
 
 import { onAuthStateChanged } from "firebase/auth"
-import { onValue } from "firebase/database"
-import { FormEvent, useEffect, useMemo, useState } from "react"
+import { onValue, ref } from "firebase/database"
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { auth, realtimeDb } from "../../lib/firebase"
 import { deleteMedication, getMedicationTime, type Medication, updateMedication } from "../../lib/medications"
-import { ref } from "firebase/database"
 
 type DoseStatus = "pending" | "taken" | "missed"
 type EditableDose = { medication: Medication; time: string; status: "pending" | "missed"; date: string }
@@ -46,7 +45,6 @@ export default function SchedulePage() {
   const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
   useEffect(() => onAuthStateChanged(auth, user => setUid(user?.uid ?? null)), [])
@@ -69,8 +67,6 @@ export default function SchedulePage() {
     .filter(x => !!x.time)
     .sort((a, b) => minutes(a.time) - minutes(b.time)), [medications, selectedKey])
 
-  // The schedule is read-only with respect to dose status. The ESP32 owns
-  // pending -> taken/missed. The web app only displays that status.
   const timeline = useMemo(() => active.map(({ medication, time }) => {
     const firebaseStatus = statusTree[medication.id]?.[selectedKey]?.[time]?.status
     const status: DoseStatus = firebaseStatus === "missed" ? "missed" : firebaseStatus === "taken" ? "taken" : "pending"
@@ -87,14 +83,12 @@ export default function SchedulePage() {
     setTime(item.time)
     setStartDate(item.medication.startDate ?? selectedKey)
     setNotes(item.medication.notes ?? "")
-    setMessage("")
     setError("")
   }
 
   function closeEdit() {
     if (saving || deleting) return
     setEditing(null)
-    setMessage("")
     setError("")
   }
 
@@ -102,42 +96,29 @@ export default function SchedulePage() {
     event.preventDefault()
     if (!uid || !editing || !name.trim() || !time) return
     setSaving(true)
-    setMessage("")
     setError("")
     try {
       await updateMedication(uid, editing.medication.id, {
-        name: name.trim(),
-        dosage: dosage.trim(),
-        unit,
-        time,
-        active: true,
-        form,
-        frequency,
-        startDate,
-        notes: notes.trim(),
+        name: name.trim(), dosage: dosage.trim(), unit, time, active: true,
+        form, frequency, startDate, notes: notes.trim(),
       }, editing.date, editing.time, editing.status)
       setEditing(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save changes.")
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   async function removeMedication() {
     if (!uid || !editing) return
     if (!window.confirm(`Delete ${editing.medication.name}?`)) return
     setDeleting(true)
-    setMessage("")
     setError("")
     try {
       await deleteMedication(uid, editing.medication.id)
       setEditing(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to delete medication.")
-    } finally {
-      setDeleting(false)
-    }
+    } finally { setDeleting(false) }
   }
 
   const calendarCells: Array<Date | null> = []
@@ -166,7 +147,7 @@ export default function SchedulePage() {
       <section className="edit-card" style={{ width: "min(405px,calc(100vw - 32px))", maxHeight: "calc(100vh - 28px)", overflowY: "auto", background: "white", borderRadius: 28, padding: "22px 22px 20px", boxShadow: "0 24px 60px rgba(20,34,52,.22)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><h2 style={{ margin: 0, fontSize: 21, lineHeight: 1.15 }}>Edit medication</h2><p style={{ margin: "8px 0 0", color: "#71808e", fontSize: 13 }}>Update the details of this medicine.</p></div><button onClick={closeEdit} style={{ width: 32, height: 32, border: 0, background: "transparent", color: "#71808e", cursor: "pointer" }}><Icon type="close" size={21}/></button></div>
         <form onSubmit={saveEdit}>
-          {([['Medication name', <input required className="edit-field" value={name} onChange={e=>setName(e.target.value)} />], ['Dosage', <input className="edit-field" inputMode="decimal" value={dosage} onChange={e=>setDosage(e.target.value)} />]] as Array<[string, React.ReactNode]>).map(([label, control])=><label key={label} style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>{label}{control}</label>)}
+          {([['Medication name', <input required className="edit-field" value={name} onChange={e=>setName(e.target.value)} />], ['Dosage', <input className="edit-field" inputMode="decimal" value={dosage} onChange={e=>setDosage(e.target.value)} />]] as Array<[string, ReactNode]>).map(([label, control])=><label key={label} style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>{label}{control}</label>)}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Unit<select className="edit-field" value={unit} onChange={e=>setUnit(e.target.value)}><option>mg</option><option>g</option><option>mcg</option><option>mL</option><option>IU</option><option>puff</option><option>drop</option><option>unit</option></select></label>
             <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Form<select className="edit-field" value={form} onChange={e=>setForm(e.target.value)}><option>Tablet</option><option>Capsule</option><option>Liquid</option><option>Injection</option><option>Drops</option><option>Other</option></select></label>
