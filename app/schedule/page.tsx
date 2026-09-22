@@ -27,6 +27,17 @@ function monthTitle(d: Date) { return d.toLocaleDateString("en-US", { month: "lo
 function timelineTitle(d: Date) { return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }) }
 function minutes(t: string) { if (!t) return 9999; const [h, m] = t.split(":").map(Number); return (h || 0) * 60 + (m || 0) }
 function todayKey() { return dateKey(new Date()) }
+function scheduleValidationError(date: string, time: string) {
+  if (!date || !time) return "Please select a valid date and time."
+  const now = new Date()
+  const [year, month, day] = date.split("-").map(Number)
+  const [hour, minute] = time.split(":").map(Number)
+  const selected = new Date(year, month - 1, day, hour, minute, 0, 0)
+  const today = todayKey()
+  if (date < today) return "⚠️ This date has already passed. Please choose today or a future date."
+  if (date === today && selected <= now) return "⚠️ This time has already passed today. Please choose a later time."
+  return ""
+}
 
 export default function SchedulePage() {
   const router = useRouter()
@@ -73,6 +84,8 @@ export default function SchedulePage() {
     return { medication, time, status }
   }).filter(item => item.status !== "taken"), [active, selectedKey, statusTree])
 
+  const editScheduleWarning = editing ? scheduleValidationError(startDate, time) : ""
+
   function openEdit(item: { medication: Medication; time: string; status: "pending" | "missed" }) {
     setEditing({ ...item, date: selectedKey })
     setName(item.medication.name ?? "")
@@ -95,6 +108,11 @@ export default function SchedulePage() {
   async function saveEdit(event: FormEvent) {
     event.preventDefault()
     if (!uid || !editing || !name.trim() || !time) return
+    const validationError = scheduleValidationError(startDate, time)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setSaving(true)
     setError("")
     try {
@@ -154,10 +172,11 @@ export default function SchedulePage() {
           </div>
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Frequency<select className="edit-field" value={frequency} onChange={e=>setFrequency(e.target.value)}><option>Once Daily</option><option>Twice Daily</option><option>Three Times Daily</option><option>Four Times Daily</option><option>As Needed</option></select></label>
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Time<input className="edit-field" required type="time" value={time} onChange={e=>setTime(e.target.value)} /></label>
-          <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Start date<input className="edit-field" required type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} /></label>
+          <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Start date<input className="edit-field" required type="date" min={todayKey()} value={startDate} onChange={e=>setStartDate(e.target.value)} /></label>
+          {editScheduleWarning && <div style={{ marginTop: 12, padding: "11px 12px", borderRadius: 14, background: "#fff7e6", border: "1px solid #f2d39a", color: "#9a5b00", fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>{editScheduleWarning}</div>}
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Notes (optional)<textarea className="edit-field edit-textarea" value={notes} onChange={e=>setNotes(e.target.value)} /></label>
           {error && <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: "#fff1f0", color: "#b42318", fontSize: 12, fontWeight: 700 }}>{error}</div>}
-          <button disabled={saving || deleting} type="submit" style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting ? .65 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
+          <button disabled={saving || deleting || !!editScheduleWarning} type="submit" style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting || !!editScheduleWarning ? .55 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
           <button disabled={saving || deleting} type="button" onClick={removeMedication} style={{ width: "100%", border: 0, background: "transparent", color: "#e23d45", fontWeight: 800, marginTop: 18, cursor: "pointer", opacity: saving || deleting ? .65 : 1 }}>{deleting ? "Deleting..." : "Delete medication"}</button>
         </form>
       </section>
