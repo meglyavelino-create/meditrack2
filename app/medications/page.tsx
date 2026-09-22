@@ -277,6 +277,10 @@ export default function MedicationsPage() {
                 <label className="field-label">Frequency</label>
                 <select className="field" value={frequency} onChange={e => setFrequency(e.target.value)}>
                   <option>Once Daily</option>
+                  <option>Twice Daily</option>
+                  <option>Three Times Daily</option>
+                  <option>Four Times Daily</option>
+                  <option>As Needed</option>
                 </select>
               </div>
             </div>
