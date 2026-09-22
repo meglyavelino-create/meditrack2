@@ -5,7 +5,6 @@ import { onAuthStateChanged } from "firebase/auth"
 import { useRouter } from "next/navigation"
 import { auth } from "../../lib/firebase"
 import { createMedication } from "../../lib/medications"
-import { createPendingDose } from "../../lib/dose-status"
 
 function Icon({ type, size = 26 }: { type: "pill" | "close"; size?: number }) {
   const common = {
@@ -55,7 +54,7 @@ export default function MedicationsPage() {
     setMessage("")
 
     try {
-      const medication = await createMedication(uid, {
+      await createMedication(uid, {
         name: name.trim(),
         dosage: dosage.trim(),
         unit,
@@ -67,7 +66,8 @@ export default function MedicationsPage() {
         notes: notes.trim(),
       })
 
-      await createPendingDose(uid, medication.id, time)
+      // The web app only creates the medication schedule.
+      // It does NOT create or change a pending/taken/missed dose record.
       setMessage("Medication added successfully.")
       setTimeout(() => router.push("/dashboard"), 500)
     } catch (error) {
