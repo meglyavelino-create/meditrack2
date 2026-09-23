@@ -52,8 +52,6 @@ export default function ProfilePage() {
   const router = useRouter()
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [count, setCount] = useState(0)
-  const [condition, setCondition] = useState("")
-  const [allergies, setAllergies] = useState("")
   const [todayTaken, setTodayTaken] = useState(0)
   const [todayMissed, setTodayMissed] = useState(0)
   const [todayPending, setTodayPending] = useState(0)
@@ -119,15 +117,6 @@ export default function ProfilePage() {
     }
   }, [user])
 
-  useEffect(() => {
-    try {
-      setCondition(localStorage.getItem("meditrack.condition") || "")
-      setAllergies(localStorage.getItem("meditrack.allergies") || "")
-    } catch {
-      // Ignore localStorage errors.
-    }
-  }, [])
-
 
   if (!user) return null
 
@@ -173,33 +162,7 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, marginTop: 22 }}>
-          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Health details</h2>
-          <p style={{ margin: "8px 0 22px", color: "#71808e", fontSize: 15 }}>Keep important information available for your medication routine.</p>
 
-          <label style={{ display: "block", color: "#587087", fontSize: 17 }}>
-            Conditions
-            <input className="field" value={condition} onChange={(event) => {
-              setCondition(event.target.value)
-              try { localStorage.setItem("meditrack.condition", event.target.value) } catch {}
-            }} placeholder="e.g. Hypertension" style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }} />
-          </label>
-
-          <label style={{ display: "block", marginTop: 22, color: "#587087", fontSize: 17 }}>
-            Allergies
-            <input className="field" value={allergies} onChange={(event) => {
-              setAllergies(event.target.value)
-              try { localStorage.setItem("meditrack.allergies", event.target.value) } catch {}
-            }} placeholder="e.g. Penicillin" style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }} />
-          </label>
-        </section>
-
-        <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, marginTop: 22 }}>
-          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Reminder preferences</h2>
-          <p style={{ margin: "8px 0 0", color: "#71808e", fontSize: 15, lineHeight: 1.5 }}>
-            Medication reminders are managed by your scheduled doses and the MediTrack device.
-          </p>
-        </section>
       </div>
 
       <BottomNav onNavigate={(path) => router.push(path)} />
