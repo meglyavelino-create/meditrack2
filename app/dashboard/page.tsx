@@ -67,9 +67,23 @@ export default function DashboardPage() {
   // is recorded as missed by the web app.
   useEffect(() => {
     if (!user || medications.length === 0) return
-    void markExpiredPendingDoses(user.uid, medications, statusTree).catch(e => {
-      setError(e instanceof Error ? e.message : "Unable to update expired doses.")
-    })
+
+    let cancelled = false
+    const run = async () => {
+      if (cancelled) return
+      try {
+        await markExpiredPendingDoses(user.uid, medications, statusTree)
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Unable to update expired doses.")
+      }
+    }
+
+    void run()
+    const timer = window.setInterval(() => void run(), 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
   }, [user, medications, statusTree])
 
   const todayDate = todayKey(now)
