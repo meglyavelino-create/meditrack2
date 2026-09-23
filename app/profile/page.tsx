@@ -162,7 +162,10 @@ export default function ProfilePage() {
           </div>
         </section>
 
-
+        <div style={{ textAlign: "center", padding: "22px 0 8px", color: "#71808e" }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#142234" }}>MediTrack</div>
+          <div style={{ marginTop: 4, fontSize: 13 }}>Medication Reminder System · v1.0</div>
+        </div>
       </div>
 
       <BottomNav onNavigate={(path) => router.push(path)} />
