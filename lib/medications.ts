@@ -36,6 +36,32 @@ function todayKey() {
   return dateKey(new Date())
 }
 
+function validateMedicationInput(medication: {
+  name: string
+  dosage: string
+  unit: string
+  time: string
+  form?: string
+  frequency?: string
+  startDate?: string
+}) {
+  if (!medication.name.trim()) throw new Error("Medication name is required.")
+  if (!medication.dosage.trim()) throw new Error("Dosage is required.")
+
+  const dosage = Number(medication.dosage)
+  if (!Number.isFinite(dosage) || dosage <= 0) {
+    throw new Error("Dosage must be greater than 0.")
+  }
+
+  if (!medication.unit.trim()) throw new Error("Unit is required.")
+  if (!medication.form?.trim()) throw new Error("Form is required.")
+  if (!medication.frequency?.trim()) throw new Error("Frequency is required.")
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(medication.time)) {
+    throw new Error("A valid schedule time is required.")
+  }
+  if (!medication.startDate?.trim()) throw new Error("Start date is required.")
+}
+
 function scheduledTimestamp(date: string, time: string) {
   const [year, month, day] = date.split("-").map(Number)
   const [hour, minute] = time.split(":").map(Number)
@@ -111,6 +137,8 @@ export async function createMedication(
     notes?: string
   },
 ) {
+  validateMedicationInput(medication)
+
   const medicationRef = push(ref(realtimeDb, `medications/${uid}`))
   const now = Date.now()
   const medicationId = medicationRef.key!
@@ -161,6 +189,8 @@ export async function updateMedication(
   previousTime: string,
   currentStatus: "pending" | "missed" = "pending",
 ) {
+  validateMedicationInput(medication)
+
   const now = Date.now()
   const startDate = medication.startDate ?? todayKey()
   const record = {
