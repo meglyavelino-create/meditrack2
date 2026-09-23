@@ -47,6 +47,11 @@ function scheduledTimestamp(date: string, time: string) {
  * A pending dose becomes missed 10 minutes after its scheduled date/time.
  * This also creates missing historical status records for the last 7 days,
  * so an offline device cannot leave an old dose permanently Pending.
+ *
+ * The current medication model stores one actual time ("times.0").
+ * Therefore the web fallback only auto-expires "Once Daily" schedules.
+ * Frequencies such as Twice Daily / As Needed need multiple explicit
+ * dose times before the web app can safely infer every scheduled dose.
  */
 export async function markExpiredPendingDoses(
   uid: string,
@@ -60,6 +65,7 @@ export async function markExpiredPendingDoses(
 
   for (const medication of medications) {
     if (medication.active === false) continue
+    if ((medication.frequency ?? "Once Daily") !== "Once Daily") continue
     const time = getMedicationTime(medication)
     if (!time) continue
 
