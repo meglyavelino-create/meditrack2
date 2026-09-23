@@ -19,6 +19,14 @@ function Icon({ type, size = 27 }: { type: IconType; size?: number }) {
   return <svg {...c}><circle cx="12" cy="8" r="3.2" /><path d="M5 21a7 7 0 0 1 14 0" /></svg>
 }
 
+function StatusIcon({ type, size = 24 }: { type: "active" | "taken" | "pending" | "missed"; size?: number }) {
+  const c = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const }
+  if (type === "active") return <svg {...c}><rect x="6.5" y="3" width="11" height="18" rx="5.5" /><path d="M6.5 12h11" /></svg>
+  if (type === "taken") return <svg {...c}><circle cx="12" cy="12" r="9" /><path d="m7.5 12 3 3 6-6" /></svg>
+  if (type === "pending") return <svg {...c}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+  return <svg {...c}><circle cx="12" cy="12" r="9" /><path d="M12 7v5M12 16.5v.5" /></svg>
+}
+
 function WifiIcon({ size = 31 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -189,10 +197,10 @@ export default function ProfilePage() {
           </p>
 
           <div className="profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 15 }}>
-            <Stat label="Active" value={count} />
-            <Stat label="Taken" value={todayTaken} />
-            <Stat label="Pending" value={todayPending} />
-            <Stat label="Missed" value={todayMissed} />
+            <Stat label="Active" value={count} icon="active" />
+            <Stat label="Taken" value={todayTaken} icon="taken" />
+            <Stat label="Pending" value={todayPending} icon="pending" />
+            <Stat label="Missed" value={todayMissed} icon="missed" />
           </div>
         </section>
 
@@ -270,9 +278,14 @@ export default function ProfilePage() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, icon }: { label: string; value: number; icon: "active" | "taken" | "pending" | "missed" }) {
+  const iconColor = icon === "taken" ? "#3aa87d" : icon === "missed" ? "#df5d64" : icon === "pending" ? "#d89b32" : "#4d79a7"
+
   return (
-    <div style={{ minWidth: 0, padding: "18px 10px", borderRadius: 20, background: "#edf5f2", textAlign: "center" }}>
+    <div style={{ minWidth: 0, padding: "16px 10px", borderRadius: 20, background: "#edf5f2", textAlign: "center" }}>
+      <div style={{ width: 38, height: 38, margin: "0 auto 7px", borderRadius: "50%", background: "white", color: iconColor, display: "grid", placeItems: "center" }}>
+        <StatusIcon type={icon} size={21} />
+      </div>
       <div style={{ fontSize: 28, fontWeight: 800, color: "#142234" }}>{value}</div>
       <div style={{ marginTop: 5, fontSize: 13, color: "#71808e", fontWeight: 700 }}>{label}</div>
     </div>
