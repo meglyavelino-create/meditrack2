@@ -99,6 +99,17 @@ export default function SchedulePage() {
   }).filter(item => item.status !== "taken"), [active, selectedKey, statusTree])
 
   const editScheduleWarning = editing ? scheduleValidationError(startDate, time) : ""
+  const editDosageError = dosage.trim()
+    ? (Number.isFinite(Number(dosage)) && Number(dosage) > 0 ? "" : "Enter a dosage greater than 0.")
+    : "Dosage is required."
+  const editRequiredFieldsMissing =
+    !name.trim() ||
+    !!editDosageError ||
+    !unit ||
+    !form ||
+    !frequency ||
+    !time ||
+    !startDate
 
   function openEdit(item: { medication: Medication; time: string; status: "pending" | "missed" }) {
     setEditing({ ...item, date: selectedKey })
@@ -121,7 +132,7 @@ export default function SchedulePage() {
 
   async function saveEdit(event: FormEvent) {
     event.preventDefault()
-    if (!uid || !editing || !name.trim() || !time) return
+    if (!uid || !editing || editRequiredFieldsMissing) return
     const validationError = scheduleValidationError(startDate, time)
     if (validationError) {
       setError(validationError)
@@ -179,7 +190,7 @@ export default function SchedulePage() {
       <section className="edit-card" style={{ width: "min(405px,calc(100vw - 32px))", maxHeight: "calc(100vh - 28px)", overflowY: "auto", background: "white", borderRadius: 28, padding: "22px 22px 20px", boxShadow: "0 24px 60px rgba(20,34,52,.22)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}><div><h2 style={{ margin: 0, fontSize: 21, lineHeight: 1.15 }}>Edit medication</h2><p style={{ margin: "8px 0 0", color: "#71808e", fontSize: 13 }}>Update the details of this medicine.</p></div><button onClick={closeEdit} style={{ width: 32, height: 32, border: 0, background: "transparent", color: "#71808e", cursor: "pointer" }}><Icon type="close" size={21}/></button></div>
         <form onSubmit={saveEdit}>
-          {([['Medication name', <input required className="edit-field" value={name} onChange={e=>setName(e.target.value)} />], ['Dosage', <input className="edit-field" inputMode="decimal" value={dosage} onChange={e=>setDosage(e.target.value)} />]] as Array<[string, ReactNode]>).map(([label, control])=><label key={label} style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>{label}{control}</label>)}
+          {([['Medication name', <input required className="edit-field" value={name} onChange={e=>setName(e.target.value)} />], ['Dosage', <><input required className={`edit-field ${editDosageError ? "edit-invalid-field" : ""}`} type="number" min="0.01" step="any" inputMode="decimal" value={dosage} onChange={e=>setDosage(e.target.value)} />{editDosageError && <div className="edit-warning">{editDosageError}</div>}</>]] as Array<[string, ReactNode]>).map(([label, control])=><label key={label} style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>{label}{control}</label>)}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
             <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Unit<select className="edit-field" value={unit} onChange={e=>setUnit(e.target.value)}><option>mg</option><option>g</option><option>mcg</option><option>mL</option><option>IU</option><option>puff</option><option>drop</option><option>unit</option></select></label>
             <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Form<select className="edit-field" value={form} onChange={e=>setForm(e.target.value)}><option>Tablet</option><option>Capsule</option><option>Liquid</option><option>Injection</option><option>Drops</option><option>Other</option></select></label>
@@ -189,12 +200,13 @@ export default function SchedulePage() {
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Start date<input className="edit-field" required type="date" min={todayKey()} value={startDate} onChange={e=>setStartDate(e.target.value)} /></label>
           {editScheduleWarning && <div style={{ marginTop: 12, padding: "11px 12px", borderRadius: 14, background: "#fff7e6", border: "1px solid #f2d39a", color: "#9a5b00", fontSize: 12, fontWeight: 700, lineHeight: 1.4 }}>{editScheduleWarning}</div>}
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Notes (optional)<textarea className="edit-field edit-textarea" value={notes} onChange={e=>setNotes(e.target.value)} /></label>
+          {editRequiredFieldsMissing && <div className="edit-warning" style={{ marginTop: 12 }}>Please complete all required fields. Notes is optional.</div>}
           {error && <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: "#fff1f0", color: "#b42318", fontSize: 12, fontWeight: 700 }}>{error}</div>}
-          <button disabled={saving || deleting || !!editScheduleWarning} type="submit" style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting || !!editScheduleWarning ? .55 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
+          <button disabled={saving || deleting || editRequiredFieldsMissing || !!editScheduleWarning} type="submit"> style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting || !!editScheduleWarning ? .55 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
           <button disabled={saving || deleting} type="button" onClick={removeMedication} style={{ width: "100%", border: 0, background: "transparent", color: "#e23d45", fontWeight: 800, marginTop: 18, cursor: "pointer", opacity: saving || deleting ? .65 : 1 }}>{deleting ? "Deleting..." : "Delete medication"}</button>
         </form>
       </section>
-      <style>{`.edit-field{display:block;width:100%;height:42px;margin-top:7px;border:1px solid #dce7e3;border-radius:22px;padding:0 14px;background:#edf4f1;color:#263847;font-size:14px;outline:none;font-weight:400}.edit-field:focus{border-color:#45ae80;box-shadow:0 0 0 2px rgba(69,174,128,.12)}select.edit-field{cursor:pointer}.edit-textarea{height:72px;padding-top:12px;resize:vertical;border-radius:18px}`}</style>
+      <style>{`.edit-warning{margin-top:7px;padding:10px 12px;border-radius:14px;background:#fff4e5;border:1px solid #f2c98c;color:#9a5b00;font-size:12px;line-height:1.35;font-weight:700}.edit-invalid-field{border-color:#e5a94d!important;background:#fff9ef!important}.edit-field{display:block;width:100%;height:42px;margin-top:7px;border:1px solid #dce7e3;border-radius:22px;padding:0 14px;background:#edf4f1;color:#263847;font-size:14px;outline:none;font-weight:400}.edit-field:focus{border-color:#45ae80;box-shadow:0 0 0 2px rgba(69,174,128,.12)}select.edit-field{cursor:pointer}.edit-textarea{height:72px;padding-top:12px;resize:vertical;border-radius:18px}`}</style>
     </div>}
   </main>
 }
