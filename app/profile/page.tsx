@@ -39,11 +39,21 @@ function Icon({ type, size = 27 }: { type: IconType; size?: number }) {
     )
   }
 
-
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="8" r="3.2" />
       <path d="M5 21a7 7 0 0 1 14 0" />
+    </svg>
+  )
+}
+
+function WifiIcon({ size = 30 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 8.8a15.5 15.5 0 0 1 19 0" />
+      <path d="M5.8 12.3a10.5 10.5 0 0 1 12.4 0" />
+      <path d="M9.2 15.8a5.5 5.5 0 0 1 5.6 0" />
+      <circle cx="12" cy="19.2" r="1" fill="currentColor" stroke="none" />
     </svg>
   )
 }
@@ -57,18 +67,18 @@ export default function ProfilePage() {
   const [todayPending, setTodayPending] = useState(0)
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
+    return onAuthStateChanged(auth, (u) => {
       if (!u) {
         setUser(null)
         router.replace("/login")
         return
       }
 
-      const displayName = u.displayName || "there"
-      setUser({ name: displayName, email: u.email || "" })
+      setUser({
+        name: u.displayName || "there",
+        email: u.email || "",
+      })
     })
-
-    return unsubscribe
   }, [router])
 
   useEffect(() => {
@@ -91,23 +101,24 @@ export default function ProfilePage() {
     const unsubscribeStatus = onValue(ref(realtimeDb, `doseStatus/${uid}`), (snapshot) => {
       const tree = snapshot.val() as Record<string, Record<string, Record<string, { status?: string }>>> | null
       let taken = 0
-      let missedCount = 0
+      let missed = 0
       let pending = 0
 
       if (tree) {
         for (const medication of Object.values(tree)) {
           const doses = medication?.[today]
           if (!doses) continue
+
           for (const dose of Object.values(doses)) {
             if (dose?.status === "taken") taken += 1
-            else if (dose?.status === "missed") missedCount += 1
+            else if (dose?.status === "missed") missed += 1
             else if (dose?.status === "pending") pending += 1
           }
         }
       }
 
       setTodayTaken(taken)
-      setTodayMissed(missedCount)
+      setTodayMissed(missed)
       setTodayPending(pending)
     })
 
@@ -117,10 +128,7 @@ export default function ProfilePage() {
     }
   }, [user])
 
-
   if (!user) return null
-
-  const initial = (user.name || "G").trim().charAt(0).toUpperCase()
 
   return (
     <main
@@ -136,29 +144,54 @@ export default function ProfilePage() {
         * { box-sizing: border-box; }
         @media (max-width: 600px) {
           .profile-wrap { padding-left: 16px !important; padding-right: 16px !important; }
-          .profile-title { font-size: 32px !important; }
-          .profile-card { padding: 24px !important; border-radius: 30px !important; }
-          .account-card { padding: 24px !important; }
-          .account-avatar { width: 76px !important; height: 76px !important; font-size: 38px !important; }
-          .account-name { font-size: 23px !important; }
-          .account-email { font-size: 16px !important; }
-          .section-title { font-size: 23px !important; }
-          .field { height: 56px !important; }
-          .setting-title { font-size: 18px !important; }
           .profile-stats { grid-template-columns: repeat(2, 1fr) !important; }
+          .profile-card { padding: 24px !important; border-radius: 26px !important; }
         }
       `}</style>
 
       <header style={{ background: "#fff", borderBottom: "1px solid #dce8e4" }}>
-        <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "30px 22px" }}>
+        <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "34px 22px 28px" }}>
+          <h1 style={{ margin: 0, fontSize: 36, lineHeight: 1.1, letterSpacing: -1, fontWeight: 800 }}>
+            Profile
+          </h1>
+          <p style={{ margin: "8px 0 0", color: "#71808e", fontSize: 17 }}>
+            Medication overview and device
+          </p>
+        </div>
+      </header>
+
+      <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "28px 22px" }}>
         <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28 }}>
-          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Medication overview</h2>
-          <p style={{ margin: "8px 0 20px", color: "#71808e", fontSize: 15 }}>A quick view of your medication activity today.</p>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Medication overview</h2>
+          <p style={{ margin: "8px 0 20px", color: "#71808e", fontSize: 15 }}>
+            A quick view of your medication activity today.
+          </p>
+
           <div className="profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
             <Stat label="Active" value={count} />
             <Stat label="Taken" value={todayTaken} />
             <Stat label="Pending" value={todayPending} />
             <Stat label="Missed" value={todayMissed} />
+          </div>
+        </section>
+
+        <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, marginTop: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Reminder device</h2>
+
+          <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ width: 58, height: 58, borderRadius: 18, background: "#edf5f2", color: "#3eaa7d", display: "grid", placeItems: "center", flexShrink: 0 }}>
+              <WifiIcon size={31} />
+            </div>
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>ESP32 Medicine Reminder</div>
+              <div style={{ marginTop: 5, color: "#71808e", fontSize: 14 }}>
+                Wi-Fi connection
+              </div>
+              <div style={{ marginTop: 3, color: "#71808e", fontSize: 14 }}>
+                DS3231 • Firebase Sync
+              </div>
+            </div>
           </div>
         </section>
 
@@ -170,24 +203,6 @@ export default function ProfilePage() {
 
       <BottomNav onNavigate={(path) => router.push(path)} />
     </main>
-  )
-}
-
-function Toggle({ title, subtitle, value, setValue }: { title: string; subtitle: string; value: boolean; setValue: (value: boolean) => void }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 18, padding: "20px 0", borderTop: "1px solid #e5ece9", marginTop: 17 }}>
-      <div style={{ minWidth: 0 }}>
-        <div className="setting-title" style={{ fontSize: 19, fontWeight: 800 }}>{title}</div>
-        <div className="setting-subtitle" style={{ fontSize: 15, color: "#71808e", marginTop: 5 }}>{subtitle}</div>
-      </div>
-      <button
-        onClick={() => setValue(!value)}
-        aria-label={title}
-        style={{ width: 59, height: 34, border: 0, borderRadius: 20, background: value ? "#45ae80" : "#d5dfdc", padding: 3, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: value ? "flex-end" : "flex-start", flexShrink: 0 }}
-      >
-        <span style={{ width: 28, height: 28, borderRadius: "50%", background: "white", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,.12)" }} />
-      </button>
-    </div>
   )
 }
 
@@ -213,6 +228,7 @@ function BottomNav({ onNavigate }: { onNavigate: (path: string) => void }) {
       <div style={{ width: "100%", maxWidth: 760, display: "grid", gridTemplateColumns: "repeat(4,1fr)" }}>
         {items.map((item) => {
           const active = item.label === "Profile"
+
           return (
             <button
               key={item.label}
