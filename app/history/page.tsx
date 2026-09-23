@@ -5,7 +5,7 @@ import { onValue, ref } from "firebase/database"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { auth, realtimeDb } from "../../lib/firebase"
-import { getMedicationTime, type Medication } from "../../lib/medications"
+import { getMedicationTime, markExpiredPendingDoses, type Medication } from "../../lib/medications"
 
 type Status = "taken" | "missed" | "pending"
 type Dose = { medication: Medication; date: string; time: string; status: Status }
@@ -44,6 +44,27 @@ export default function HistoryPage() {
     if (!uid) { setRecords({}); return }
     return onValue(ref(realtimeDb, `doseStatus/${uid}`), s => setRecords(s.val() || {}))
   }, [uid])
+  useEffect(() => {
+    if (!uid || medications.length === 0) return
+
+    let cancelled = false
+    const run = async () => {
+      if (cancelled) return
+      try {
+        await markExpiredPendingDoses(uid, medications, records)
+      } catch {
+        // The live Firebase listener remains the source of displayed history.
+        // Dashboard/Schedule will retry the same fallback if this page cannot write.
+      }
+    }
+
+    void run()
+    const timer = window.setInterval(() => void run(), 30000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [uid, medications, records])
 
   const doses = useMemo(() => {
     const out: Dose[] = []
