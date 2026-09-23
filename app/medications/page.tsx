@@ -44,6 +44,7 @@ function isPastSchedule(dateValue: string, timeValue: string) {
 
 function scheduleWarning(dateValue: string, timeValue: string) {
   if (!dateValue) return "Please select a start date."
+  if (!timeValue) return "Please select a schedule time."
   const today = todayKey()
 
   if (dateValue < today) {
@@ -54,6 +55,13 @@ function scheduleWarning(dateValue: string, timeValue: string) {
     return "This schedule time has already passed today. Please choose a later time."
   }
 
+  return ""
+}
+
+function dosageWarning(value: string) {
+  if (!value.trim()) return "Dosage is required."
+  const amount = Number(value)
+  if (!Number.isFinite(amount) || amount <= 0) return "Enter a dosage greater than 0."
   return ""
 }
 
@@ -74,10 +82,19 @@ export default function MedicationsPage() {
   useEffect(() => onAuthStateChanged(auth, user => setUid(user?.uid ?? null)), [])
 
   const warning = scheduleWarning(startDate, time)
+  const dosageError = dosageWarning(dosage)
+  const requiredFieldsMissing =
+    !name.trim() ||
+    !!dosageError ||
+    !unit ||
+    !form ||
+    !frequency ||
+    !time ||
+    !startDate
 
   async function submit(event: FormEvent) {
     event.preventDefault()
-    if (!uid || !name.trim() || !time || warning) return
+    if (!uid || requiredFieldsMissing || warning) return
 
     setSaving(true)
     setMessage("")
@@ -287,7 +304,8 @@ export default function MedicationsPage() {
             <div className="form-grid">
               <div className="field-group">
                 <label className="field-label">Dosage</label>
-                <input className="field" inputMode="decimal" placeholder="500" value={dosage} onChange={e => setDosage(e.target.value)} />
+                <input className={`field ${dosageError ? "invalid-field" : ""}`} required type="number" min="0.01" step="any" inputMode="decimal" placeholder="500" value={dosage} onChange={e => setDosage(e.target.value)} />
+                {dosageError && <div className="warning-box"><Icon type="warning" size={17} /><span>{dosageError}</span></div>}
               </div>
               <div className="field-group">
                 <label className="field-label">Unit</label>
@@ -345,9 +363,10 @@ export default function MedicationsPage() {
               <textarea className="field textarea" placeholder="e.g. Take with food" value={notes} onChange={e => setNotes(e.target.value)} />
             </div>
 
+            {requiredFieldsMissing && <div className="warning-box"><Icon type="warning" size={17} /><span>Please complete all required fields. Notes is optional.</span></div>}
             {message && <div className="message">{message}</div>}
 
-            <button className="create-button" disabled={saving || !!warning} type="submit">
+            <button className="create-button" disabled={saving || requiredFieldsMissing || !!warning} type="submit">
               {saving ? "Creating..." : "Create medication"}
             </button>
           </form>
