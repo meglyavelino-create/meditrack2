@@ -228,11 +228,20 @@ export async function updateMedication(
     userId: uid,
   }
 
+  // If a missed dose is rescheduled to a date/time in the future,
+  // it becomes a new pending dose. A missed result should remain
+  // missed only when the edited schedule is not moved forward.
+  const newScheduleAt = scheduledTimestamp(startDate, medication.time)
+  const statusAfterEdit =
+    currentStatus === "missed" && newScheduleAt > now
+      ? "pending"
+      : currentStatus
+
   const updates: Record<string, unknown> = {
     [`medications/${uid}/${medicationId}`]: record,
     [`doseStatus/${uid}/${medicationId}/${previousDate}/${previousTime}`]: null,
     [`doseStatus/${uid}/${medicationId}/${startDate}/${medication.time}`]: {
-      status: currentStatus,
+      status: statusAfterEdit,
       updatedAt: now,
     },
   }
