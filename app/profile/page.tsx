@@ -1,13 +1,13 @@
 "use client"
 
-import { onAuthStateChanged, signOut } from "firebase/auth"
+import { onAuthStateChanged } from "firebase/auth"
 import { onValue, ref } from "firebase/database"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { auth, realtimeDb } from "../../lib/firebase"
 import type { Medication } from "../../lib/medications"
 
-type IconType = "home" | "calendar" | "history" | "profile" | "logout"
+type IconType = "home" | "calendar" | "history" | "profile"
 
 function Icon({ type, size = 27 }: { type: IconType; size?: number }) {
   if (type === "home") {
@@ -39,15 +39,6 @@ function Icon({ type, size = 27 }: { type: IconType; size?: number }) {
     )
   }
 
-  if (type === "logout") {
-    return (
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 17l5-5-5-5" />
-        <path d="M15 12H3" />
-        <path d="M13 4h6v16h-6" />
-      </svg>
-    )
-  }
 
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -62,11 +53,10 @@ export default function ProfilePage() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
   const [count, setCount] = useState(0)
   const [condition, setCondition] = useState("")
-  const [name, setName] = useState("")
-  const [reminders, setReminders] = useState(true)
-  const [sound, setSound] = useState(true)
-  const [vibration, setVibration] = useState(true)
-  const [missed, setMissed] = useState(true)
+  const [allergies, setAllergies] = useState("")
+  const [todayTaken, setTodayTaken] = useState(0)
+  const [todayMissed, setTodayMissed] = useState(0)
+  const [todayPending, setTodayPending] = useState(0)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -76,9 +66,8 @@ export default function ProfilePage() {
         return
       }
 
-      const displayName = u.displayName || u.email?.split("@")[0] || "there"
+      const displayName = u.displayName || "there"
       setUser({ name: displayName, email: u.email || "" })
-      setName(displayName)
     })
 
     return unsubscribe
@@ -90,46 +79,55 @@ export default function ProfilePage() {
     const uid = auth.currentUser?.uid
     if (!uid) return
 
-    return onValue(ref(realtimeDb, `medications/${uid}`), (snapshot) => {
+    const unsubscribeMedications = onValue(ref(realtimeDb, `medications/${uid}`), (snapshot) => {
       const value = snapshot.val() as Record<string, Medication> | null
       const activeCount = value
         ? Object.values(value).filter((medication) => medication.active !== false).length
         : 0
       setCount(activeCount)
     })
+
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
+
+    const unsubscribeStatus = onValue(ref(realtimeDb, `doseStatus/${uid}`), (snapshot) => {
+      const tree = snapshot.val() as Record<string, Record<string, Record<string, { status?: string }>>> | null
+      let taken = 0
+      let missedCount = 0
+      let pending = 0
+
+      if (tree) {
+        for (const medication of Object.values(tree)) {
+          const doses = medication?.[today]
+          if (!doses) continue
+          for (const dose of Object.values(doses)) {
+            if (dose?.status === "taken") taken += 1
+            else if (dose?.status === "missed") missedCount += 1
+            else if (dose?.status === "pending") pending += 1
+          }
+        }
+      }
+
+      setTodayTaken(taken)
+      setTodayMissed(missedCount)
+      setTodayPending(pending)
+    })
+
+    return () => {
+      unsubscribeMedications()
+      unsubscribeStatus()
+    }
   }, [user])
 
   useEffect(() => {
-    if (!user) return
-
     try {
       setCondition(localStorage.getItem("meditrack.condition") || "")
-      setName(localStorage.getItem("meditrack.name") || user.name || "")
-      setReminders(localStorage.getItem("meditrack.reminders") !== "false")
-      setSound(localStorage.getItem("meditrack.sound") !== "false")
-      setVibration(localStorage.getItem("meditrack.vibration") !== "false")
-      setMissed(localStorage.getItem("meditrack.missed") !== "false")
+      setAllergies(localStorage.getItem("meditrack.allergies") || "")
     } catch {
       // Ignore localStorage errors.
     }
-  }, [user])
+  }, [])
 
-  function save(key: string, value: boolean | string) {
-    try {
-      localStorage.setItem(key, String(value))
-    } catch {
-      // Ignore localStorage errors.
-    }
-  }
-
-  async function handleSignOut() {
-    try {
-      await signOut(auth)
-      router.replace("/login")
-    } catch {
-      // Keep the current page if sign-out fails.
-    }
-  }
 
   if (!user) return null
 
@@ -158,95 +156,50 @@ export default function ProfilePage() {
           .section-title { font-size: 23px !important; }
           .field { height: 56px !important; }
           .setting-title { font-size: 18px !important; }
-          .setting-subtitle { font-size: 15px !important; }
+          .profile-stats { grid-template-columns: repeat(2, 1fr) !important; }
         }
       `}</style>
 
       <header style={{ background: "#fff", borderBottom: "1px solid #dce8e4" }}>
-        <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "38px 22px 30px" }}>
-          <h1 className="profile-title" style={{ margin: 0, fontSize: 38, lineHeight: 1.05, letterSpacing: -1.1, fontWeight: 800 }}>
-            Profile
-          </h1>
-          <p style={{ margin: "9px 0 0", color: "#71808e", fontSize: 18 }}>
-            Account and notifications
-          </p>
-        </div>
-      </header>
-
-      <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "30px 22px" }}>
-        <section
-          className="profile-card account-card"
-          style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, display: "flex", alignItems: "center", gap: 20 }}
-        >
-          <div
-            className="account-avatar"
-            style={{ width: 86, height: 86, borderRadius: "50%", background: "#f07808", color: "white", display: "grid", placeItems: "center", fontSize: 43, fontWeight: 500, flexShrink: 0 }}
-          >
-            {initial}
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div className="account-name" style={{ fontSize: 25, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {user.name}
-            </div>
-            <div className="account-email" style={{ fontSize: 17, color: "#71808e", marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {user.email}
-            </div>
-            <div style={{ fontSize: 17, color: "#45ae80", marginTop: 8 }}>
-              <strong>{count} active medicines</strong>
-            </div>
+        <div className="profile-wrap" style={{ maxWidth: 760, margin: "0 auto", padding: "30px 22px" }}>
+        <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28 }}>
+          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Medication overview</h2>
+          <p style={{ margin: "8px 0 20px", color: "#71808e", fontSize: 15 }}>A quick view of your medication activity today.</p>
+          <div className="profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
+            <Stat label="Active" value={count} />
+            <Stat label="Taken" value={todayTaken} />
+            <Stat label="Pending" value={todayPending} />
+            <Stat label="Missed" value={todayMissed} />
           </div>
         </section>
 
         <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, marginTop: 22 }}>
-          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>
-            Health details
-          </h2>
+          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Health details</h2>
+          <p style={{ margin: "8px 0 22px", color: "#71808e", fontSize: 15 }}>Keep important information available for your medication routine.</p>
 
-          <label style={{ display: "block", marginTop: 26, color: "#587087", fontSize: 17 }}>
+          <label style={{ display: "block", color: "#587087", fontSize: 17 }}>
             Conditions
-            <input
-              className="field"
-              value={condition}
-              onChange={(event) => {
-                setCondition(event.target.value)
-                save("meditrack.condition", event.target.value)
-              }}
-              placeholder="e.g. Hypertension"
-              style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }}
-            />
+            <input className="field" value={condition} onChange={(event) => {
+              setCondition(event.target.value)
+              try { localStorage.setItem("meditrack.condition", event.target.value) } catch {}
+            }} placeholder="e.g. Hypertension" style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }} />
           </label>
 
           <label style={{ display: "block", marginTop: 22, color: "#587087", fontSize: 17 }}>
-            Full name
-            <input
-              className="field"
-              value={name}
-              onChange={(event) => {
-                setName(event.target.value)
-                save("meditrack.name", event.target.value)
-              }}
-              style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }}
-            />
+            Allergies
+            <input className="field" value={allergies} onChange={(event) => {
+              setAllergies(event.target.value)
+              try { localStorage.setItem("meditrack.allergies", event.target.value) } catch {}
+            }} placeholder="e.g. Penicillin" style={{ display: "block", width: "100%", height: 58, marginTop: 10, border: "1px solid #d6e1de", borderRadius: 29, padding: "0 20px", fontSize: 17, color: "#142234", background: "#edf5f2", outline: "none" }} />
           </label>
         </section>
 
         <section className="profile-card" style={{ background: "white", border: "1px solid #dce7e3", borderRadius: 30, padding: 28, marginTop: 22 }}>
-          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>
-            Notification settings
-          </h2>
-          <Toggle title="Dose reminders" subtitle="Push alert at each scheduled time" value={reminders} setValue={(value) => { setReminders(value); save("meditrack.reminders", value) }} />
-          <Toggle title="Reminder sound" subtitle="Play a chime with each alert" value={sound} setValue={(value) => { setSound(value); save("meditrack.sound", value) }} />
-          <Toggle title="Vibration" subtitle="Vibrate when a reminder fires" value={vibration} setValue={(value) => { setVibration(value); save("meditrack.vibration", value) }} />
-          <Toggle title="Missed dose alerts" subtitle="Follow up if a dose is missed" value={missed} setValue={(value) => { setMissed(value); save("meditrack.missed", value) }} />
+          <h2 className="section-title" style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>Reminder preferences</h2>
+          <p style={{ margin: "8px 0 0", color: "#71808e", fontSize: 15, lineHeight: 1.5 }}>
+            Medication reminders are managed by your scheduled doses and the MediTrack device.
+          </p>
         </section>
-
-        <button
-          onClick={handleSignOut}
-          style={{ width: "100%", height: 58, marginTop: 24, border: "1px solid #dce7e3", borderRadius: 30, background: "white", color: "#ef3f3f", fontSize: 17, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 9 }}
-        >
-          <Icon type="logout" size={20} />
-          Sign out
-        </button>
       </div>
 
       <BottomNav onNavigate={(path) => router.push(path)} />
@@ -268,6 +221,15 @@ function Toggle({ title, subtitle, value, setValue }: { title: string; subtitle:
       >
         <span style={{ width: 28, height: 28, borderRadius: "50%", background: "white", display: "block", boxShadow: "0 1px 3px rgba(0,0,0,.12)" }} />
       </button>
+    </div>
+  )
+}
+
+function Stat({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={{ minWidth: 0, padding: "16px 10px", borderRadius: 18, background: "#edf5f2", textAlign: "center" }}>
+      <div style={{ fontSize: 25, fontWeight: 800, color: "#142234" }}>{value}</div>
+      <div style={{ marginTop: 4, fontSize: 12, color: "#71808e", fontWeight: 700 }}>{label}</div>
     </div>
   )
 }
