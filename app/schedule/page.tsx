@@ -202,7 +202,7 @@ export default function SchedulePage() {
           <label style={{ display: "block", marginTop: 14, fontSize: 13, fontWeight: 800 }}>Notes (optional)<textarea className="edit-field edit-textarea" value={notes} onChange={e=>setNotes(e.target.value)} /></label>
           {editRequiredFieldsMissing && <div className="edit-warning" style={{ marginTop: 12 }}>Please complete all required fields. Notes is optional.</div>}
           {error && <div style={{ marginTop: 12, padding: 10, borderRadius: 12, background: "#fff1f0", color: "#b42318", fontSize: 12, fontWeight: 700 }}>{error}</div>}
-          <button disabled={saving || deleting || editRequiredFieldsMissing || !!editScheduleWarning} type="submit"> style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting || !!editScheduleWarning ? .55 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
+          <button disabled={saving || deleting || editRequiredFieldsMissing || !!editScheduleWarning} type="submit" style={{ width: "100%", height: 48, border: 0, borderRadius: 25, background: "#45ae80", color: "white", fontWeight: 800, fontSize: 15, marginTop: 18, cursor: "pointer", opacity: saving || deleting || editRequiredFieldsMissing || !!editScheduleWarning ? .55 : 1 }}>{saving ? "Saving..." : "Save changes"}</button>
           <button disabled={saving || deleting} type="button" onClick={removeMedication} style={{ width: "100%", border: 0, background: "transparent", color: "#e23d45", fontWeight: 800, marginTop: 18, cursor: "pointer", opacity: saving || deleting ? .65 : 1 }}>{deleting ? "Deleting..." : "Delete medication"}</button>
         </form>
       </section>
