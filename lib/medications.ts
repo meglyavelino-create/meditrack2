@@ -1,4 +1,4 @@
-import { push, ref, remove, update } from "firebase/database"
+import { push, ref, remove, runTransaction, update } from "firebase/database"
 import { realtimeDb } from "./firebase"
 
 export type Medication = {
@@ -111,6 +111,10 @@ export async function markExpiredPendingDoses(
       const dueAt = scheduledTimestamp(date, time)
       if (now < dueAt + 10 * 60 * 1000) continue
 
+      // Do not use the listener snapshot as the final authority here.
+      // It can be briefly stale while the ESP32 is writing "taken".
+      // The transaction checks Firebase's current value and will retry
+      // automatically if another writer changes it at the same time.
       updates[`doseStatus/${uid}/${medication.id}/${date}/${time}`] = {
         status: "missed",
         updatedAt: now,
@@ -119,7 +123,24 @@ export async function markExpiredPendingDoses(
   }
 
   if (Object.keys(updates).length > 0) {
-    await update(ref(realtimeDb), updates)
+    await Promise.all(
+      Object.entries(updates).map(async ([path, value]) => {
+        await runTransaction(ref(realtimeDb, path), current => {
+          const currentStatus =
+            current && typeof current === "object"
+              ? (current as { status?: string }).status
+              : undefined
+
+          // ESP32 "taken" and an already-recorded "missed" result are
+          // authoritative and must never be overwritten by the web fallback.
+          if (currentStatus === "taken" || currentStatus === "missed") {
+            return current
+          }
+
+          return value
+        })
+      }),
+    )
   }
 }
 
